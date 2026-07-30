@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "Elyx Vault Extension",
+  "version": "1.2.0",
+  "description": "Zero-knowledge password vault extension for auto-filling login credentials across web domains.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://*/*",
+    "http://*/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*/*",
+        "http://*/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  }
+}

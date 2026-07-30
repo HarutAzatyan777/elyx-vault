@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Elyx Vault</title>
+  <style>
+    :root {
+      --bg-main: #020617;
+      --bg-card: #0f172a;
+      --bg-input: #1e293b;
+      --border-color: #334155;
+      --accent-primary: #6366f1;
+      --accent-hover: #4f46e5;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --error-bg: rgba(127, 29, 29, 0.4);
+      --error-border: #7f1d1d;
+      --error-text: #fca5a5;
+      --success-text: #34d399;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 340px;
+      margin: 0;
+      padding: 16px;
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .brand-icon {
+      width: 22px;
+      height: 22px;
+      color: var(--accent-primary);
+    }
+
+    .title {
+      font-size: 15px;
+      font-weight: 700;
+      color: #ffffff;
+      margin: 0;
+      letter-spacing: -0.01em;
+    }
+
+    .logout-btn {
+      background: transparent;
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .logout-btn:hover {
+      background-color: var(--bg-input);
+      color: #ffffff;
+    }
+
+    /* Views */
+    .view {
+      display: none;
+    }
+
+    .view.active {
+      display: block;
+    }
+
+    /* Forms & Inputs */
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    .label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .input {
+      width: 100%;
+      padding: 8px 12px;
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      color: #ffffff;
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.2s ease;
+    }
+
+    .input:focus {
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25);
+    }
+
+    .select {
+      width: 100%;
+      padding: 8px 12px;
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      color: #ffffff;
+      font-size: 13px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .select:focus {
+      border-color: var(--accent-primary);
+    }
+
+    /* Buttons */
+    .btn-primary {
+      width: 100%;
+      padding: 10px 16px;
+      background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-hover) 100%);
+      color: #ffffff;
+      font-weight: 600;
+      font-size: 13px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+      transition: all 0.2s ease;
+      margin-top: 4px;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      opacity: 0.95;
+      transform: translateY(-1px);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .btn-secondary {
+      width: 100%;
+      padding: 8px 12px;
+      background-color: var(--bg-card);
+      color: var(--text-muted);
+      font-weight: 600;
+      font-size: 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: all 0.2s ease;
+    }
+
+    .btn-secondary:hover {
+      background-color: var(--bg-input);
+      color: #ffffff;
+    }
+
+    /* Domain badge */
+    .domain-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 10px;
+      background-color: rgba(99, 102, 241, 0.1);
+      border: 1px solid rgba(99, 102, 241, 0.2);
+      border-radius: 8px;
+      margin-bottom: 14px;
+      font-size: 12px;
+    }
+
+    .domain-icon {
+      width: 14px;
+      height: 14px;
+      color: var(--accent-primary);
+      flex-shrink: 0;
+    }
+
+    .domain-name {
+      font-weight: 600;
+      color: #ffffff;
+      word-break: break-all;
+    }
+
+    /* Card Details */
+    .project-card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+
+    .project-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #ffffff;
+      margin: 0 0 4px 0;
+    }
+
+    .project-url {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin: 0 0 8px 0;
+      word-break: break-all;
+    }
+
+    /* Error & Status */
+    .alert-error {
+      padding: 8px 10px;
+      background-color: var(--error-bg);
+      border: 1px solid var(--error-border);
+      border-radius: 6px;
+      color: var(--error-text);
+      font-size: 12px;
+      margin-bottom: 12px;
+    }
+
+    .status-msg {
+      margin-top: 10px;
+      font-size: 12px;
+      text-align: center;
+      min-height: 18px;
+    }
+
+    .status-success {
+      color: var(--success-text);
+    }
+
+    .status-error {
+      color: var(--error-text);
+    }
+
+    .spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-top-color: #ffffff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <!-- Extension Header -->
+  <div class="header">
+    <div class="brand">
+      <svg class="brand-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+      </svg>
+      <h1 class="title">Elyx Vault</h1>
+    </div>
+    <button id="logout-btn" class="logout-btn" style="display: none;">Lock / Logout</button>
+  </div>
+
+  <!-- Error Banner -->
+  <div id="error-banner" class="alert-error" style="display: none;"></div>
+
+  <!-- VIEW 1: LOGIN -->
+  <div id="login-view" class="view active">
+    <form id="login-form">
+      <div class="form-group">
+        <label for="email" class="label">Firebase Account Email</label>
+        <input id="email" type="email" placeholder="user@example.com" required class="input" />
+      </div>
+
+      <div class="form-group">
+        <label for="password" class="label">Account Password</label>
+        <input id="password" type="password" placeholder="••••••••" required class="input" />
+      </div>
+
+      <div class="form-group">
+        <label for="master-password" class="label">Master Password (Vault Encryption)</label>
+        <input id="master-password" type="password" placeholder="Master password" required class="input" />
+      </div>
+
+      <button id="login-btn" type="submit" class="btn-primary">
+        <span id="login-btn-text">Unlock Vault & Log In</span>
+        <div id="login-spinner" class="spinner" style="display: none;"></div>
+      </button>
+    </form>
+  </div>
+
+  <!-- VIEW 2: VAULT & AUTO-FILL -->
+  <div id="vault-view" class="view">
+    <!-- Active Domain Bar -->
+    <div class="domain-bar">
+      <svg class="domain-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+      </svg>
+      <div>Active Site: <span id="active-domain" class="domain-name">Detecting...</span></div>
+    </div>
+
+    <!-- Project Selection Dropdown -->
+    <div class="form-group">
+      <label for="project-select" class="label">Select Saved Credentials</label>
+      <select id="project-select" class="select"></select>
+    </div>
+
+    <!-- Selected Project Info Card -->
+    <div id="project-card" class="project-card" style="display: none;">
+      <div id="card-title" class="project-title"></div>
+      <div id="card-url" class="project-url"></div>
+    </div>
+
+    <!-- Action Buttons -->
+    <button id="autofill-btn" class="btn-primary">
+      <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+      </svg>
+      Auto-fill Selected
+    </button>
+
+    <button id="copy-pass-btn" class="btn-secondary">Copy Password to Clipboard</button>
+  </div>
+
+  <!-- Global Status Message -->
+  <div id="status-msg" class="status-msg"></div>
+
+  <!-- CryptoJS Library for AES Decryption -->
+  <script src="crypto-js.js"></script>
+  <!-- Main Popup Script -->
+  <script src="popup.js"></script>
+</body>
+</html>
