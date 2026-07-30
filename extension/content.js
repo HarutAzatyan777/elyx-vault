@@ -47,19 +47,29 @@
    * @param {string} value - Text value to insert
    */
   function fillInputValue(element, value) {
-    if (!element || value === undefined || value === null) return;
+    if (!element || value === undefined || value === null || value === '') return;
     
     try {
       element.focus();
     } catch (e) {}
 
-    // Direct assignment bypasses prototype invocation errors while updating the DOM value
-    element.value = value;
+    // Use native prototype setter to support React, Angular, Vue and native forms
+    try {
+      const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+      if (nativeInputValueSetter) {
+        nativeInputValueSetter.call(element, value);
+      } else {
+        element.value = value;
+      }
+    } catch (e) {
+      element.value = value;
+    }
 
     // Dispatch full synthetic event lifecycle for React, Angular, and native forms
     try {
       element.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
       element.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+      element.dispatchEvent(new Event('blur', { bubbles: true, composed: true }));
     } catch (e) {}
   }
 
@@ -179,33 +189,85 @@
       return;
     }
 
-    // Poll for Email Field to ensure DOM readiness
-    let attempts = 0;
-    const maxAttempts = 35;
     let emailFilled = false;
+
+    function tryFillEmail() {
+      if (emailFilled || !rawEmail) return true;
+
+      const emailSelectors = [
+        'input[type="email"]',
+        '#identifierId',
+        'input[name="identifier"]',
+        '#login_field',
+        '#user_login',
+        'input[name="login"]',
+        'input[name="email"]',
+        'input[name="user"]',
+        'input[id*="email" i]',
+        'input[id*="identifier" i]',
+        'input[id*="user" i]',
+        'input[id*="login" i]'
+      ];
+
+      for (const sel of emailSelectors) {
+        const el = document.querySelector(sel);
+        if (el && el.offsetParent !== null && !el.disabled) {
+          emailFilled = true;
+          fillInputValue(el, rawEmail);
+
+          setTimeout(() => {
+            const nextBtn = document.querySelector('#identifierNext button, #identifierNext, button[type="submit"], button[data-primary-action="true"]');
+            if (nextBtn) {
+              clickElement(nextBtn);
+            }
+            observeAndFillPassword(passwordValue);
+          }, 350);
+
+          return true;
+        }
+      }
+      return false;
+    }
+
+    // 1. Synchronous attempt (0ms delay)
+    if (tryFillEmail()) return;
+
+    // 2. High-frequency polling (every 40ms)
+    let attempts = 0;
+    const maxAttempts = 100;
+    let observer = null;
+
+    const cleanup = () => {
+      if (pollInterval) clearInterval(pollInterval);
+      if (observer) {
+        observer.disconnect();
+        observer = null;
+      }
+    };
 
     const pollInterval = setInterval(() => {
       attempts++;
-      const emailInput = document.querySelector('input[type="email"], #identifierId, input[name="identifier"], #login_field, #user_login');
-
-      if (emailInput && !emailFilled) {
-        emailFilled = true;
-        clearInterval(pollInterval);
-        fillInputValue(emailInput, rawEmail);
-
-        // Click "Next" button for Step 1
-        setTimeout(() => {
-          const nextBtn = document.querySelector('#identifierNext button, #identifierNext, button[type="submit"], button[data-primary-action="true"]');
-          if (nextBtn) {
-            clickElement(nextBtn);
-          }
-          observeAndFillPassword(passwordValue);
-        }, 400);
-      } else if (attempts >= maxAttempts) {
-        clearInterval(pollInterval);
+      if (tryFillEmail() || attempts >= maxAttempts) {
+        cleanup();
         observeAndFillPassword(passwordValue);
       }
-    }, 150);
+    }, 40);
+
+    // 3. MutationObserver for instant DOM insertion reaction
+    if (window.MutationObserver) {
+      observer = new MutationObserver(() => {
+        if (tryFillEmail()) {
+          cleanup();
+        }
+      });
+      observer.observe(document.body || document.documentElement, {
+        childList: true,
+        subtree: true,
+        attributes: true
+      });
+    }
+
+    setTimeout(cleanup, 8000);
   }
 
   /**

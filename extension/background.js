@@ -15,7 +15,7 @@ const getStorage = () => chrome.storage.session || chrome.storage.local;
  * @param {Function} sendResponse
  */
 async function handleAutoLoginRequest(request, sendResponse) {
-  const targetUrl = request.url;
+  const targetUrl = request.url || 'https://accounts.google.com/AddSession';
   const credentials = request.credentials || {
     email: request.email || request.username || '',
     password: request.password || ''
@@ -27,7 +27,8 @@ async function handleAutoLoginRequest(request, sendResponse) {
   }
 
   try {
-    // Create new tab with target URL
+    // Strictly open a standard new tab in the current active, normal window
+    // (no incognito or isolated window types) so auth cookies save directly to main profile
     const tab = await chrome.tabs.create({ url: targetUrl, active: true });
 
     if (tab && tab.id) {
@@ -102,9 +103,9 @@ chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => 
   }
 });
 
-// 3. Monitor tab updates to send auto-fill payload as soon as page finishes loading
+// 3. Monitor tab updates to send auto-fill payload as soon as tab begins loading or completes
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-  if (changeInfo.status === 'complete') {
+  if (changeInfo.status === 'loading' || changeInfo.status === 'complete') {
     const storageKey = `pending_autofill_${tabId}`;
 
     getStorage().get([storageKey], (result) => {

@@ -15,21 +15,47 @@ import styles from './ProjectCard.module.css';
 export const ProjectCard = ({ project, masterPassword, onDelete }) => {
   const [isCopied, setIsCopied] = useState(false);
 
-  const getDecryptedPassword = () => {
+  const getDecryptedData = () => {
     const ciphertext = project.encryptedCredentials || project.encryptedPassword || '';
-    return decryptData(ciphertext, masterPassword);
+    const decrypted = decryptData(ciphertext, masterPassword);
+
+    if (!decrypted) return { email: '', password: '' };
+
+    let email = project.email || project.username || '';
+    let password = decrypted;
+
+    try {
+      const parsed = JSON.parse(decrypted);
+      if (parsed && typeof parsed === 'object') {
+        if (parsed.email || parsed.username) email = parsed.email || parsed.username;
+        if (parsed.password || parsed.secret) password = parsed.password || parsed.secret;
+      }
+    } catch (e) {
+      // Plain text password
+    }
+
+    if (!email && project.loginUrl) {
+      const match = project.loginUrl.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+      if (match) email = match[0];
+    }
+
+    if (!email && project.name && project.name.includes('@')) {
+      email = project.name.trim();
+    }
+
+    return { email, password };
   };
 
   const handleCopyPassword = async () => {
-    const decrypted = getDecryptedPassword();
+    const { password } = getDecryptedData();
 
-    if (!decrypted) {
+    if (!password) {
       alert('Wrong master password');
       return;
     }
 
     try {
-      await navigator.clipboard.writeText(decrypted);
+      await navigator.clipboard.writeText(password);
       setIsCopied(true);
       setTimeout(() => {
         setIsCopied(false);
@@ -41,15 +67,15 @@ export const ProjectCard = ({ project, masterPassword, onDelete }) => {
   };
 
   const handleLaunchAutoLogin = () => {
-    const decryptedPassword = getDecryptedPassword();
+    const { email, password } = getDecryptedData();
 
-    if (!decryptedPassword) {
+    if (!password) {
       alert('Wrong master password. Please verify master password to launch auto-login.');
       return;
     }
 
     // Account identifier / email
-    const emailValue = project.username || project.email || project.loginUrl || project.name || '';
+    const emailValue = email || project.email || project.username || '';
 
     // Force Google AddSession & prompt=select_account to bypass active session cookie overrides
     let targetUrl = 'https://accounts.google.com/v3/signin/identifier?prompt=select_account&flowName=GlifWebSignIn&flowEntry=AddSession';
@@ -57,9 +83,24 @@ export const ProjectCard = ({ project, masterPassword, onDelete }) => {
       targetUrl = project.loginUrl;
     }
 
+    // Append login_hint for Google URLs to pre-fill email instantly natively
+    if (emailValue && targetUrl.includes('google.com')) {
+      try {
+        const u = new URL(targetUrl);
+        if (!u.searchParams.has('login_hint')) {
+          u.searchParams.set('login_hint', emailValue);
+        }
+        if (!u.searchParams.has('Email')) {
+          u.searchParams.set('Email', emailValue);
+        }
+        targetUrl = u.toString();
+      } catch (e) {}
+    }
+
     const credentials = {
       email: emailValue,
-      password: decryptedPassword
+      username: emailValue,
+      password: password
     };
 
     // Encode security payload for URL hash fragment fallback
@@ -100,6 +141,9 @@ export const ProjectCard = ({ project, masterPassword, onDelete }) => {
       : `https://${project.loginUrl}`
     : '#';
 
+  const { email: decryptedEmail } = getDecryptedData();
+  const displayEmail = project.email || project.username || decryptedEmail || '';
+
   return (
     <div className={styles.card}>
       <div className={styles.content}>
@@ -128,6 +172,12 @@ export const ProjectCard = ({ project, masterPassword, onDelete }) => {
             </svg>
           </button>
         </div>
+
+        {displayEmail && (
+          <p className={styles.emailText} title={displayEmail}>
+            {displayEmail}
+          </p>
+        )}
 
         {project.loginUrl ? (
           <a

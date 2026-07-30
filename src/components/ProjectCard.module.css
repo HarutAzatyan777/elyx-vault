@@ -60,6 +60,16 @@
   margin-bottom: 1.5rem;
 }
 
+.emailText {
+  font-size: 0.8125rem;
+  color: #38bdf8;
+  font-weight: 500;
+  margin: 0 0 0.5rem 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .link {
   font-size: 0.875rem;
   color: #94a3b8;

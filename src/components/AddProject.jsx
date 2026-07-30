@@ -11,6 +11,7 @@ import styles from './AddProject.module.css';
  */
 export const AddProject = ({ masterPassword }) => {
   const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
   const [loginUrl, setLoginUrl] = useState('');
   const [secretData, setSecretData] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -32,7 +33,13 @@ export const AddProject = ({ masterPassword }) => {
     setMessage({ text: '', isError: false });
 
     try {
-      const encryptedCredentials = encryptData(secretData, masterPassword);
+      const payload = JSON.stringify({
+        email: email.trim(),
+        username: email.trim(),
+        password: secretData.trim(),
+      });
+
+      const encryptedCredentials = encryptData(payload, masterPassword);
 
       if (!encryptedCredentials) {
         setMessage({ text: 'Encryption failed. Please check master password.', isError: true });
@@ -42,12 +49,15 @@ export const AddProject = ({ masterPassword }) => {
 
       await addDoc(collection(db, 'projects'), {
         name: name.trim(),
+        email: email.trim(),
+        username: email.trim(),
         loginUrl: loginUrl.trim(),
         encryptedCredentials,
         createdAt: new Date().toISOString(),
       });
 
       setName('');
+      setEmail('');
       setLoginUrl('');
       setSecretData('');
       setMessage({ text: 'Project encrypted and added successfully!', isError: false });
@@ -72,6 +82,17 @@ export const AddProject = ({ masterPassword }) => {
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g., GitHub Account"
               required
+              className={styles.input}
+            />
+          </div>
+
+          <div className={styles.field}>
+            <label className={styles.label}>Email / Username</label>
+            <input
+              type="text"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="e.g., user@example.com"
               className={styles.input}
             />
           </div>
