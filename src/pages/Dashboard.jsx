@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, deleteDoc, query, where } from 'firebase/firestore';
 import { db } from '../config/firebase.js';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../hooks/useAuth.jsx';
 import { MasterPassModal } from '../components/MasterPassModal';
 import { ProjectCard } from '../components/ProjectCard';
 import AddProject from '../components/AddProject';
 import InstallGuideModal from '../components/InstallGuideModal';
+import UserManagement from '../components/UserManagement';
 import styles from './Dashboard.module.css';
 
 export const Dashboard = () => {
-  const { user, logout } = useAuth();
+  const { user, access, logout } = useAuth();
   const [projects, setProjects] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [masterPassword, setMasterPassword] = useState(null);
@@ -20,7 +21,8 @@ export const Dashboard = () => {
       if (!user) return;
       setIsLoading(true);
       try {
-        const querySnapshot = await getDocs(collection(db, 'projects'));
+        const projectsQuery = query(collection(db, 'projects'), where('businessId', '==', access.businessId));
+        const querySnapshot = await getDocs(projectsQuery);
         const fetchedProjects = querySnapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
@@ -34,7 +36,7 @@ export const Dashboard = () => {
     };
 
     fetchProjects();
-  }, [user]);
+  }, [user, access]);
 
   const handleLockVault = () => {
     setMasterPassword(null);
@@ -99,6 +101,7 @@ export const Dashboard = () => {
           </button>
 
           <span className={styles.userEmail}>{user?.email}</span>
+          <span className={styles.roleBadge}>{access?.role}</span>
 
           {masterPassword && (
             <button onClick={handleLockVault} className={styles.lockButton}>
@@ -118,9 +121,13 @@ export const Dashboard = () => {
           <MasterPassModal onSubmit={(pass) => setMasterPassword(pass)} />
         ) : (
           <>
-            <div className={styles.adminSection}>
-              <AddProject masterPassword={masterPassword} />
-            </div>
+            {access.role === 'manager' && <UserManagement />}
+
+            {access.role !== 'viewer' && (
+              <div className={styles.adminSection}>
+                <AddProject masterPassword={masterPassword} />
+              </div>
+            )}
 
             <div>
               <div className={styles.sectionHeader}>

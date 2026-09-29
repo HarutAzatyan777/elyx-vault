@@ -108,6 +108,16 @@
   font-weight: 500;
 }
 
+.roleBadge {
+  color: #c7d2fe;
+  background: #312e81;
+  border-radius: 999px;
+  padding: 0.25rem 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
 .lockButton {
   padding: 0.5rem 1rem;
   font-size: 0.875rem;

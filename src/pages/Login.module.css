@@ -117,6 +117,19 @@
   margin-top: 0.1rem;
 }
 
+.switchAccountBtn {
+  width: 100%;
+  margin: -0.5rem 0 1rem;
+  border: 1px solid #475569;
+  border-radius: 0.6rem;
+  padding: 0.7rem 1rem;
+  color: #cbd5e1;
+  background: transparent;
+  cursor: pointer;
+}
+
+.switchAccountBtn:hover { background: rgb(51 65 85 / 45%); }
+
 .form {
   display: flex;
   flex-direction: column;

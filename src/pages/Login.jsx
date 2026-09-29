@@ -2,12 +2,10 @@ import React, { useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import {
   signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  GoogleAuthProvider,
-  signInWithPopup
+  createUserWithEmailAndPassword
 } from 'firebase/auth';
 import { auth } from '../config/firebase';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../hooks/useAuth.jsx';
 import styles from './Login.module.css';
 
 /**
@@ -42,7 +40,7 @@ const getErrorMessage = (errorCode) => {
 };
 
 export const Login = () => {
-  const { user, loading: authLoading } = useAuth();
+  const { user, access, loading: authLoading, accessError, loginWithGoogle, logout } = useAuth();
   const navigate = useNavigate();
 
   const [mode, setMode] = useState('signin'); // 'signin' | 'signup'
@@ -60,7 +58,7 @@ export const Login = () => {
     );
   }
 
-  if (user) {
+  if (user && access) {
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -93,8 +91,7 @@ export const Login = () => {
     setErrorMessage('');
     setIsSubmitting(true);
     try {
-      const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
+      await loginWithGoogle();
       navigate('/dashboard', { replace: true });
     } catch (error) {
       if (error?.code !== 'auth/popup-closed-by-user') {
@@ -153,7 +150,7 @@ export const Login = () => {
           </button>
         </div>
 
-        {errorMessage && (
+        {(errorMessage || accessError) && (
           <div className={styles.errorAlert} role="alert">
             <svg
               className={styles.errorIcon}
@@ -168,8 +165,14 @@ export const Login = () => {
                 d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
               />
             </svg>
-            <span>{errorMessage}</span>
+            <span>{errorMessage || accessError}</span>
           </div>
+        )}
+
+        {user && !access && (
+          <button type="button" className={styles.switchAccountBtn} onClick={logout}>
+            Sign out and choose another account
+          </button>
         )}
 
         <form onSubmit={handleSubmit} className={styles.form}>
@@ -284,7 +287,7 @@ export const Login = () => {
             <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
             <path fill="#34A853" d="M12 23.5c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 21.03 7.7 23.5 12 23.5z"/>
           </svg>
-          Google Workspace
+          Continue with Google
         </button>
 
         <div className={styles.footerNote}>

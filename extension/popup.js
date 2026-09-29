@@ -11,6 +11,8 @@ const FIREBASE_PROJECT_ID = 'elyx-vault';
 // Global state
 let state = {
   idToken: null,
+  userId: null,
+  businessId: null,
   userEmail: null,
   masterPassword: null,
   projects: [],
@@ -47,10 +49,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   await detectActiveTab();
 
   // Check saved session in storage
-  chrome.storage.local.get(['idToken', 'userEmail', 'masterPassword'], async (result) => {
+  chrome.storage.local.get(['idToken', 'userId', 'userEmail', 'masterPassword'], async (result) => {
     if (result.idToken && result.masterPassword) {
       state.idToken = result.idToken;
       state.userEmail = result.userEmail;
+      state.userId = result.userId || null;
       state.masterPassword = result.masterPassword;
       
       const success = await fetchAndLoadProjects();
@@ -84,12 +87,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       const authData = await firebaseSignIn(email, password);
       
       state.idToken = authData.idToken;
+      state.userId = authData.localId;
       state.userEmail = authData.email || email;
       state.masterPassword = masterPassword;
 
       // Save session to storage
       chrome.storage.local.set({
         idToken: state.idToken,
+        userId: state.userId,
         userEmail: state.userEmail,
         masterPassword: state.masterPassword
       });
@@ -111,10 +116,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   logoutBtn.addEventListener('click', () => {
     state.idToken = null;
     state.userEmail = null;
+    state.userId = null;
+    state.businessId = null;
     state.masterPassword = null;
     state.projects = [];
     state.selectedProjectId = null;
-    chrome.storage.local.remove(['idToken', 'userEmail', 'masterPassword']);
+    chrome.storage.local.remove(['idToken', 'userId', 'userEmail', 'masterPassword']);
     showLoginView();
     clearStatus();
   });
@@ -226,9 +233,43 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   async function fetchAndLoadProjects() {
     try {
-      const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/projects`;
+      if (!state.userId) {
+        const lookupResponse = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${FIREBASE_API_KEY}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ idToken: state.idToken })
+        });
+        const lookup = await lookupResponse.json();
+        state.userId = lookup.users?.[0]?.localId || null;
+      }
+      if (!state.userId) throw new Error('Session expired. Please log in again.');
+
+      const accessUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/userAccess/${encodeURIComponent(state.userId)}`;
+      const accessResponse = await fetch(accessUrl, { headers: { 'Authorization': `Bearer ${state.idToken}` } });
+      if (!accessResponse.ok) throw new Error('This account does not have vault access.');
+      const accessDocument = await accessResponse.json();
+      state.businessId = accessDocument.fields?.businessId?.stringValue;
+      if (!state.businessId) throw new Error('This account is not connected to a business.');
+
+      const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:runQuery`;
       const response = await fetch(url, {
-        headers: { 'Authorization': `Bearer ${state.idToken}` }
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${state.idToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          structuredQuery: {
+            from: [{ collectionId: 'projects' }],
+            where: {
+              fieldFilter: {
+                field: { fieldPath: 'businessId' },
+                op: 'EQUAL',
+                value: { stringValue: state.businessId }
+              }
+            }
+          }
+        })
       });
 
       if (!response.ok) {
@@ -239,7 +280,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       const data = await response.json();
-      const rawDocs = data.documents || [];
+      const rawDocs = (Array.isArray(data) ? data : []).map(result => result.document).filter(Boolean);
 
       state.projects = rawDocs.map(doc => {
         const fields = doc.fields || {};

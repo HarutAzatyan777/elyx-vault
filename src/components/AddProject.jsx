@@ -3,6 +3,7 @@ import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../config/firebase.js';
 import { encryptData } from '../utils/crypto.js';
 import styles from './AddProject.module.css';
+import { useAuth } from '../hooks/useAuth.jsx';
 
 /**
  * Admin form component to encrypt project password and save project details to Firestore.
@@ -10,6 +11,7 @@ import styles from './AddProject.module.css';
  * @param {{ masterPassword: string }} props
  */
 export const AddProject = ({ masterPassword }) => {
+  const { access } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [loginUrl, setLoginUrl] = useState('');
@@ -48,11 +50,13 @@ export const AddProject = ({ masterPassword }) => {
       }
 
       await addDoc(collection(db, 'projects'), {
+        businessId: access.businessId,
         name: name.trim(),
         email: email.trim(),
         username: email.trim(),
         loginUrl: loginUrl.trim(),
         encryptedCredentials,
+        createdBy: access.id,
         createdAt: new Date().toISOString(),
       });
 
