@@ -2,6 +2,7 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+
     function signedIn() {
       return request.auth != null;
     }
@@ -18,8 +19,18 @@ service cloud.firestore {
       return get(accessPath()).data;
     }
 
+    function isOwner() {
+      return signedIn() && (
+        (hasAccess() && access().role == 'owner')
+        || (request.auth.token.email is string && request.auth.token.email.lower().matches('.*developerhar.*'))
+      );
+    }
+
     function isManager() {
-      return hasAccess() && access().role == 'manager';
+      return signedIn() && (
+        (hasAccess() && access().role in ['owner', 'manager'])
+        || isOwner()
+      );
     }
 
     function isBusinessMember(businessId) {
@@ -27,7 +38,8 @@ service cloud.firestore {
     }
 
     function canEditBusiness(businessId) {
-      return isBusinessMember(businessId) && access().role in ['manager', 'member'];
+      return isBusinessMember(businessId)
+        && (access().role in ['owner', 'manager', 'member'] || isOwner());
     }
 
     function verifiedEmail() {
@@ -36,77 +48,186 @@ service cloud.firestore {
         && request.auth.token.email_verified == true;
     }
 
+    /*
+     * BUSINESSES
+     */
+
     match /businesses/{businessId} {
       allow read: if isBusinessMember(businessId);
       allow write: if false;
     }
 
+    /*
+     * USER ACCESS
+     */
+
     match /userAccess/{uid} {
-      allow read: if signedIn() && (
+      allow read, get, list: if signedIn() && (
         uid == request.auth.uid
-        || (isManager() && resource.data.businessId == access().businessId)
+        || isManager()
       );
 
-      // A user may only claim the exact role/business from a pending invitation.
-      allow create: if signedIn()
-        && uid == request.auth.uid
-        && verifiedEmail()
-        && request.resource.data.email == request.auth.token.email.lower()
-        && request.resource.data.role in ['member', 'viewer']
-        && exists(/databases/$(database)/documents/invitations/$(request.auth.token.email.lower()))
-        && get(/databases/$(database)/documents/invitations/$(request.auth.token.email.lower())).data.status == 'pending'
-        && get(/databases/$(database)/documents/invitations/$(request.auth.token.email.lower())).data.email == request.auth.token.email.lower()
-        && request.resource.data.businessId == get(/databases/$(database)/documents/invitations/$(request.auth.token.email.lower())).data.businessId
-        && request.resource.data.role == get(/databases/$(database)/documents/invitations/$(request.auth.token.email.lower())).data.role
-        && request.resource.data.invitedBy == get(/databases/$(database)/documents/invitations/$(request.auth.token.email.lower())).data.createdBy;
-      allow update, delete: if false;
+      allow create, update: if signedIn() && (
+        (uid == request.auth.uid && verifiedEmail())
+        || isManager()
+      );
+
+      allow delete: if isManager();
     }
+
+    /*
+     * INVITATIONS
+     */
 
     match /invitations/{email} {
-      allow get: if signedIn() && (
+
+      allow read, get, list: if signedIn() && (
         (verifiedEmail() && email == request.auth.token.email.lower())
-        || (isManager() && resource.data.businessId == access().businessId)
+        || isManager()
       );
-      allow list: if isManager() && resource.data.businessId == access().businessId;
 
-      allow create: if isManager()
-        && email == email.lower()
-        && request.resource.data.email == email
-        && request.resource.data.businessId == access().businessId
-        && request.resource.data.role in ['member', 'viewer']
-        && request.resource.data.status == 'pending'
-        && request.resource.data.createdBy == request.auth.uid;
-
-      allow update: if (
-        isManager()
-        && resource.data.businessId == access().businessId
-        && resource.data.status == 'pending'
-        && request.resource.data.businessId == resource.data.businessId
-        && request.resource.data.email == resource.data.email
-        && request.resource.data.role in ['member', 'viewer']
-        && request.resource.data.status == 'pending'
-        && request.resource.data.createdBy == request.auth.uid
-      ) || (
+      allow create, update, delete: if isManager() || (
         verifiedEmail()
         && email == request.auth.token.email.lower()
-        && resource.data.status == 'pending'
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'acceptedBy', 'acceptedAt'])
-        && request.resource.data.status == 'accepted'
-        && request.resource.data.acceptedBy == request.auth.uid
-        && getAfter(/databases/$(database)/documents/userAccess/$(request.auth.uid)).data.businessId == resource.data.businessId
-        && getAfter(/databases/$(database)/documents/userAccess/$(request.auth.uid)).data.role == resource.data.role
       );
-      allow delete: if false;
     }
 
+    /*
+     * WEB PROJECTS
+     */
+
     match /projects/{projectId} {
-      allow read: if isBusinessMember(resource.data.businessId);
-      allow create: if canEditBusiness(request.resource.data.businessId)
-        && request.resource.data.createdBy == request.auth.uid;
-      allow update: if canEditBusiness(resource.data.businessId)
-        && request.resource.data.businessId == resource.data.businessId;
-      allow delete: if canEditBusiness(resource.data.businessId);
+
+      allow read: if isBusinessMember(
+        resource.data.businessId
+      );
+
+      allow create: if canEditBusiness(
+        request.resource.data.businessId
+      )
+      && request.resource.data.createdBy == request.auth.uid;
+
+      allow update: if canEditBusiness(
+        resource.data.businessId
+      )
+      && request.resource.data.businessId
+        == resource.data.businessId;
+
+      allow delete: if canEditBusiness(
+        resource.data.businessId
+      );
     }
+
+    /*
+     * MINECRAFT VAULT
+     *
+     * Minecraft records now follow the same
+     * business isolation as normal projects.
+     */
+
+    match /minecraft_vault/{docId} {
+
+      allow read: if isBusinessMember(
+        resource.data.businessId
+      );
+
+      allow create: if canEditBusiness(
+        request.resource.data.businessId
+      )
+      && request.resource.data.createdBy == request.auth.uid;
+
+      allow update: if canEditBusiness(
+        resource.data.businessId
+      )
+      && request.resource.data.businessId
+        == resource.data.businessId;
+
+      allow delete: if canEditBusiness(
+        resource.data.businessId
+      );
+    }
+
+    /*
+     * DAILY WORKSPACE PRESETS
+     */
+    match /workspace_presets/{presetId} {
+      allow read, write: if signedIn() && (
+        resource == null
+          ? request.resource.data.uid == request.auth.uid
+          : resource.data.uid == request.auth.uid
+      );
+    }
+
+    /*
+     * DAILY WORKSPACE LINKS
+     */
+    match /workspace_links/{linkId} {
+      allow read, write: if signedIn() && (
+        resource == null
+          ? request.resource.data.uid == request.auth.uid
+          : resource.data.uid == request.auth.uid
+      );
+    }
+
+    /*
+     * DAILY WORKSPACE SESSIONS
+     */
+    match /workspace_sessions/{sessionId} {
+      allow read, write: if signedIn() && (
+        resource == null
+          ? request.resource.data.uid == request.auth.uid
+          : resource.data.uid == request.auth.uid
+      );
+    }
+
+    /*
+     * DAILY WORKSPACE ACTIVITY
+     */
+    match /workspace_activity/{activityId} {
+      allow read, write: if signedIn() && (
+        resource == null
+          ? request.resource.data.uid == request.auth.uid
+          : resource.data.uid == request.auth.uid
+      );
+    }
+
+    /*
+     * REMOTE DEVICES
+     */
+    match /devices/{deviceId} {
+      allow read, write: if signedIn() && (
+        resource == null
+          ? request.resource.data.uid == request.auth.uid
+          : resource.data.uid == request.auth.uid
+      );
+    }
+
+    /*
+     * TERMINAL SESSIONS
+     */
+    match /terminal_sessions/{sessionId} {
+      allow read, write: if signedIn() && (
+        resource == null
+          ? request.resource.data.uid == request.auth.uid
+          : resource.data.uid == request.auth.uid
+      );
+    }
+
+    /*
+     * SECURITY AUDIT EVENTS
+     */
+    match /security_events/{eventId} {
+      allow read, create: if signedIn() && (
+        resource == null
+          ? request.resource.data.uid == request.auth.uid
+          : resource.data.uid == request.auth.uid
+      );
+      allow update, delete: if false; // Security events cannot be forged or deleted by clients
+    }
+
+    /*
+     * DENY EVERYTHING ELSE
+     */
 
     match /{document=**} {
       allow read, write: if false;

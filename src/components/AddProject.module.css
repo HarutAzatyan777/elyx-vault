@@ -1,17 +1,18 @@
 .formContainer {
-  background-color: #0f172a;
-  border: 1px solid #1e293b;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
   border-radius: 0.75rem;
   padding: 1.5rem;
   margin-bottom: 2rem;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-card);
   box-sizing: border-box;
+  transition: background-color 0.25s ease, border-color 0.25s ease;
 }
 
 .title {
   font-size: 1.25rem;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--text-primary);
   letter-spacing: -0.025em;
   margin: 0 0 1.25rem 0;
 }
@@ -45,17 +46,17 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #94a3b8;
+  color: var(--text-muted);
   margin-bottom: 0.5rem;
 }
 
 .input {
   width: 100%;
   padding: 0.75rem 1rem;
-  background-color: #1e293b;
-  border: 1px solid #334155;
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-subtle);
   border-radius: 0.5rem;
-  color: #ffffff;
+  color: var(--text-primary);
   font-size: 0.875rem;
   outline: none;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
@@ -63,12 +64,12 @@
 }
 
 .input::placeholder {
-  color: #64748b;
+  color: var(--text-dim);
 }
 
 .input:focus {
   border-color: #10b981;
-  box-shadow: 0 0 0 1px #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
 }
 
 .submitBtn {
@@ -100,14 +101,14 @@
 
 .messageSuccess {
   font-size: 0.875rem;
-  color: #34d399;
+  color: #10b981;
   margin-top: 0.75rem;
   margin-bottom: 0;
 }
 
 .messageError {
   font-size: 0.875rem;
-  color: #f87171;
+  color: #ef4444;
   margin-top: 0.75rem;
   margin-bottom: 0;
 }

@@ -25,27 +25,32 @@ In **Firebase Console → Authentication → Sign-in method**:
 
 This app uses Firebase's popup flow; it does not require Google One Tap or a separate OAuth client secret in the browser. The `VITE_FIREBASE_*` web configuration values are identifiers, not server secrets, and should be supplied through the deployment environment.
 
-### 2. Bootstrap the first manager
+### 2. Bootstrap the first manager (Step-by-Step)
 
-Self-promotion is deliberately forbidden by `firestore.rules`. After the manager has signed in once (so a Firebase Auth UID exists), create these documents from a trusted environment:
+Self-promotion is deliberately forbidden by `firestore.rules`. To safely establish the initial manager:
 
-```text
-businesses/acme
-  name: "Acme"
+1. **Create/identify the business document**: In Firestore Console, create a document under the `businesses` collection, for example `businesses/elyx`:
+   ```json
+   {
+     "name": "Elyx Vault"
+   }
+   ```
+2. **Find the first manager UID in Firebase Authentication**: Sign in once with Google or Email/Password, or find the target user's existing UID in **Firebase Console → Authentication → Users**.
+3. **Create the first userAccess document**: In Firestore Console, create a document under `userAccess` using the manager's exact Firebase Auth UID as the document ID (`userAccess/{MANAGER_FIREBASE_UID}`):
+   ```json
+   {
+     "businessId": "elyx",
+     "role": "manager",
+     "email": "manager@example.com",
+     "displayName": "Manager Name"
+   }
+   ```
+4. **Login using Continue with Google**: Sign in with the manager Google account. `useAuth` detects the existing `userAccess/{uid}` record and grants full manager privileges.
+5. **Invite users via UserManagement UI**: From then on, the manager can invite additional users directly from the dashboard **Manager tools** UI without manual Firestore intervention.
 
-userAccess/FIREBASE_MANAGER_UID
-  businessId: "acme"
-  role: "manager"
-  email: "manager@gmail.com"       # lowercase
-  displayName: "Manager Name"
-  createdAt: <Firestore timestamp>
-```
+### 3. Migrate existing projects and minecraft_vault documents
 
-Do not add a client feature that creates the initial manager record.
-
-### 3. Migrate existing projects
-
-Add the manager's `businessId` (for example, `"acme"`) to every existing `projects` document. Existing documents without `businessId` are intentionally inaccessible after the secure rules are deployed. New projects receive `businessId` and `createdBy` automatically.
+Add the manager's `businessId` (for example, `"elyx"`) and `createdBy` to every existing `projects` and `minecraft_vault` document in Firestore. Existing documents without `businessId` are intentionally inaccessible after the secure rules are deployed. New project and Minecraft records receive `businessId` and `createdBy` automatically from the active user's authorization state.
 
 ### 4. Deploy rules and indexes
 

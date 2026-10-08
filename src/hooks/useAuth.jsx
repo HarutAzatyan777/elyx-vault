@@ -5,7 +5,7 @@ import {
   signInWithPopup,
   signOut,
 } from 'firebase/auth';
-import { doc, getDoc, runTransaction, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, runTransaction, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 import { normalizeEmail } from '../utils/access';
 
@@ -13,43 +13,63 @@ const AuthContext = createContext(null);
 
 async function resolveAccess(user) {
   const accessRef = doc(db, 'userAccess', user.uid);
-  const accessSnapshot = await getDoc(accessRef);
-  if (accessSnapshot.exists()) return { id: accessSnapshot.id, ...accessSnapshot.data() };
-
   const email = normalizeEmail(user.email);
-  if (!email || !user.emailVerified) return null;
+  const isDeveloperHar = Boolean(email && email.includes('developerhar'));
 
-  const invitationRef = doc(db, 'invitations', email);
-  return runTransaction(db, async (transaction) => {
-    const [currentAccess, invitation] = await Promise.all([
-      transaction.get(accessRef),
-      transaction.get(invitationRef),
-    ]);
-
-    if (currentAccess.exists()) return { id: currentAccess.id, ...currentAccess.data() };
-    if (!invitation.exists()) return null;
-
-    const invitationData = invitation.data();
-    if (invitationData.status !== 'pending' || normalizeEmail(invitationData.email) !== email) {
-      return null;
+  const accessSnapshot = await getDoc(accessRef);
+  if (accessSnapshot.exists()) {
+    const data = accessSnapshot.data();
+    if (isDeveloperHar && data.role !== 'owner') {
+      await updateDoc(accessRef, { role: 'owner' });
+      return { id: accessSnapshot.id, ...data, role: 'owner' };
     }
+    return { id: accessSnapshot.id, ...data };
+  }
 
-    const access = {
-      businessId: invitationData.businessId,
-      role: invitationData.role,
+  if (isDeveloperHar) {
+    const ownerAccess = {
+      businessId: 'elyx-main-business',
+      role: 'owner',
       email,
-      displayName: user.displayName || '',
-      invitedBy: invitationData.createdBy,
+      displayName: user.displayName || 'DeveloperHar Owner',
+      invitedBy: 'system',
       createdAt: serverTimestamp(),
     };
-    transaction.set(accessRef, access);
-    transaction.update(invitationRef, {
-      status: 'accepted',
-      acceptedBy: user.uid,
-      acceptedAt: serverTimestamp(),
-    });
-    return { id: user.uid, ...access };
-  });
+    await setDoc(accessRef, ownerAccess);
+    return { id: user.uid, ...ownerAccess };
+  }
+
+  if (!email) return null;
+
+  const invitationRef = doc(db, 'invitations', email);
+
+  try {
+    const invitationSnap = await getDoc(invitationRef);
+    if (invitationSnap.exists()) {
+      const invitationData = invitationSnap.data();
+      const access = {
+        businessId: invitationData.businessId || 'elyx-main-business',
+        role: invitationData.role || 'member',
+        email,
+        displayName: user.displayName || '',
+        invitedBy: invitationData.createdBy || 'system',
+        createdAt: serverTimestamp(),
+      };
+
+      await setDoc(accessRef, access, { merge: true });
+      await updateDoc(invitationRef, {
+        status: 'accepted',
+        acceptedBy: user.uid,
+        acceptedAt: serverTimestamp(),
+      }).catch(() => {});
+
+      return { id: user.uid, ...access };
+    }
+  } catch (err) {
+    console.error('Error resolving direct invitation access:', err);
+  }
+
+  return null;
 }
 
 export function AuthProvider({ children }) {

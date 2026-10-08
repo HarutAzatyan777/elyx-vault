@@ -11,7 +11,7 @@ import { useAuth } from '../hooks/useAuth.jsx';
  * @param {{ masterPassword: string }} props
  */
 export const AddProject = ({ masterPassword }) => {
-  const { access } = useAuth();
+  const { user, access } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [loginUrl, setLoginUrl] = useState('');
@@ -28,6 +28,11 @@ export const AddProject = ({ masterPassword }) => {
 
     if (!masterPassword) {
       setMessage({ text: 'Master password is required for encryption.', isError: true });
+      return;
+    }
+
+    if (!access?.businessId || !user?.uid) {
+      setMessage({ text: 'User authorization not found. Please log in again.', isError: true });
       return;
     }
 
@@ -56,7 +61,7 @@ export const AddProject = ({ masterPassword }) => {
         username: email.trim(),
         loginUrl: loginUrl.trim(),
         encryptedCredentials,
-        createdBy: access.id,
+        createdBy: user.uid,
         createdAt: new Date().toISOString(),
       });
 

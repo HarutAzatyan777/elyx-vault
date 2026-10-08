@@ -1,185 +1,372 @@
-import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, deleteDoc, query, where } from 'firebase/firestore';
+import React, { useEffect, useState } from 'react';
+import {
+  collection,
+  deleteDoc,
+  doc,
+  onSnapshot,
+  query,
+  where,
+} from 'firebase/firestore';
+
 import { db } from '../config/firebase.js';
 import { useAuth } from '../hooks/useAuth.jsx';
+
 import { MasterPassModal } from '../components/MasterPassModal';
 import { ProjectCard } from '../components/ProjectCard';
 import AddProject from '../components/AddProject';
 import InstallGuideModal from '../components/InstallGuideModal';
+
 import UserManagement from '../components/UserManagement';
+import MinecraftVault from '../components/MinecraftVault/MinecraftVault';
+import DailyWorkspace from '../components/daily-workspace/DailyWorkspace';
+import DeviceList from '../components/remote/DeviceList';
+import DeviceEnrollmentModal from '../components/remote/DeviceEnrollmentModal';
+import RemoteTerminal from '../components/remote/RemoteTerminal';
+import { useRemoteDevices } from '../hooks/useRemoteDevices';
+import Sidebar from '../components/Sidebar';
+
 import styles from './Dashboard.module.css';
 
 export const Dashboard = () => {
   const { user, access, logout } = useAuth();
+  const {
+    devices,
+    securityEvents,
+    selectedDevice,
+    selectedDeviceId,
+    setSelectedDeviceId,
+    handleRegisterDevice,
+    handleRenameDevice,
+    handleRevokeDevice,
+  } = useRemoteDevices();
+
   const [projects, setProjects] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [masterPassword, setMasterPassword] = useState(null);
+  const [masterPassword, setMasterPassword] = useState(() => {
+    try {
+      return sessionStorage.getItem('elyx_master_pass') || localStorage.getItem('elyx_master_pass') || null;
+    } catch {
+      return null;
+    }
+  });
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
+  const [isEnrollModalOpen, setIsEnrollModalOpen] = useState(false);
+  const [mainTab, setMainTab] = useState('general');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
-    const fetchProjects = async () => {
-      if (!user) return;
-      setIsLoading(true);
-      try {
-        const projectsQuery = query(collection(db, 'projects'), where('businessId', '==', access.businessId));
-        const querySnapshot = await getDocs(projectsQuery);
-        const fetchedProjects = querySnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
+    if (!user) {
+      setProjects([]);
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+
+    const projectsCollection = collection(db, 'projects');
+    const projectsQuery = access?.businessId
+      ? query(projectsCollection, where('businessId', '==', access.businessId))
+      : projectsCollection;
+
+    const unsubscribe = onSnapshot(
+      projectsQuery,
+      (querySnapshot) => {
+        const fetchedProjects = querySnapshot.docs.map((projectDoc) => ({
+          id: projectDoc.id,
+          ...projectDoc.data(),
         }));
+
         setProjects(fetchedProjects);
-      } catch (error) {
-        console.error('[Firestore Error] Failed to fetch projects:', error);
-      } finally {
+        setIsLoading(false);
+      },
+      (error) => {
+        console.error('Error fetching projects in real-time:', error);
         setIsLoading(false);
       }
-    };
+    );
 
-    fetchProjects();
-  }, [user, access]);
+    return () => unsubscribe();
+  }, [user, access?.businessId]);
 
-  const handleLockVault = () => {
-    setMasterPassword(null);
-  };
-
-  const handleDelete = async (projectId) => {
+  const handleUnlockVault = (password, remember = true) => {
+    setMasterPassword(password);
     try {
-      await deleteDoc(doc(db, 'projects', projectId));
-      setProjects((prevProjects) => prevProjects.filter((p) => p.id !== projectId));
-    } catch (error) {
-      console.error('[Firestore Error] Failed to delete project:', error);
-      alert('Failed to delete project. Please try again.');
+      sessionStorage.setItem('elyx_master_pass', password);
+      if (remember) {
+        localStorage.setItem('elyx_master_pass', password);
+      }
+    } catch (err) {
+      console.error('Failed to store master pass:', err);
     }
   };
 
-  const triggerDownload = () => {
-    const link = document.createElement('a');
-    link.href = '/extension.zip';
-    link.download = 'extension.zip';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const handleLockVault = () => {
+    setMasterPassword(null);
+    try {
+      sessionStorage.removeItem('elyx_master_pass');
+      localStorage.removeItem('elyx_master_pass');
+    } catch (err) {
+      console.error('Failed to clear master pass:', err);
+    }
+  };
+
+  const handleDelete = async (projectId) => {
+    if (!projectId) return;
+
+    try {
+      await deleteDoc(doc(db, 'projects', projectId));
+
+      setProjects((currentProjects) =>
+        currentProjects.filter((project) => project.id !== projectId)
+      );
+    } catch (error) {
+      console.error('Error deleting project:', error);
+    }
   };
 
   const handleInstallClick = () => {
-    triggerDownload();
     setIsInstallModalOpen(true);
   };
 
   const handleTestGoogleClick = () => {
-    window.open(
-      'https://accounts.google.com/v3/signin/identifier?flowName=GlifWebSignIn&flowEntry=ServiceLogin',
-      '_blank',
-      'noopener,noreferrer'
-    );
+    window.open('https://accounts.google.com/', '_blank', 'noopener,noreferrer');
+  };
+
+  const handleTabChange = (tab) => {
+    setMainTab(tab);
+    setIsSidebarOpen(false);
   };
 
   return (
-    <div className={styles.container}>
-      {/* Header Section */}
-      <header className={styles.header}>
-        <div className={styles.brand}>
-          <svg className={styles.brandIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-          </svg>
-          <h1 className={styles.brandTitle}>Zero-Knowledge Vault</h1>
-        </div>
+    <div className={styles.layout}>
+      <Sidebar
+        activeTab={mainTab}
+        setActiveTab={handleTabChange}
+        projectsCount={projects.length}
+        userEmail={user?.email}
+        masterPassword={masterPassword}
+        onLockVault={handleLockVault}
+        onLogout={logout}
+        onInstallClick={handleInstallClick}
+        onTestGoogleClick={handleTestGoogleClick}
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+      />
 
-        <div className={styles.nav}>
-          <button onClick={handleInstallClick} className={styles.downloadBtn} title="Install to Chrome">
-            <svg className={styles.downloadIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            Install to Chrome
-          </button>
-
-          <button onClick={handleTestGoogleClick} className={styles.testGoogleBtn} title="Open Google Login Page to test auto-fill">
-            <svg className={styles.testGoogleIcon} fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z"/>
-            </svg>
-            Test Google Auto-fill
-          </button>
-
-          <span className={styles.userEmail}>{user?.email}</span>
-          <span className={styles.roleBadge}>{access?.role}</span>
-
-          {masterPassword && (
-            <button onClick={handleLockVault} className={styles.lockButton}>
-              Lock Vault
+      <div className={styles.mainWrapper}>
+        <header className={styles.topBar}>
+          <div className={styles.topBarLeft}>
+            <button
+              type="button"
+              className={styles.menuBtn}
+              onClick={() => setIsSidebarOpen(true)}
+              aria-label="Open sidebar"
+            >
+              <svg
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                width="22"
+                height="22"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M4 6h16M4 12h16M4 18h16"
+                />
+              </svg>
             </button>
-          )}
-
-          <button onClick={logout} className={styles.logoutButton}>
-            Logout
-          </button>
-        </div>
-      </header>
-
-      {/* Main Content Area */}
-      <main className={styles.main}>
-        {!masterPassword ? (
-          <MasterPassModal onSubmit={(pass) => setMasterPassword(pass)} />
-        ) : (
-          <>
-            {access.role === 'manager' && <UserManagement />}
-
-            {access.role !== 'viewer' && (
-              <div className={styles.adminSection}>
-                <AddProject masterPassword={masterPassword} />
-              </div>
-            )}
 
             <div>
-              <div className={styles.sectionHeader}>
-                <div>
-                  <h2 className={styles.sectionTitle}>Encrypted Projects</h2>
-                  <p className={styles.sectionSubtitle}>
-                    Decryption keys are generated transiently in memory and never sent to any server.
-                  </p>
-                </div>
-                <span className={styles.badge}>
-                  {projects.length} {projects.length === 1 ? 'Project' : 'Projects'}
-                </span>
-              </div>
+              <h1 className={styles.pageTitle}>
+                {mainTab === 'daily_workspace'
+                  ? '⚡ Daily Workspace'
+                  : mainTab === 'devices'
+                  ? '🖥️ My Devices & Tailscale Nodes'
+                  : mainTab === 'terminal'
+                  ? '⚡ Remote PowerShell Terminal'
+                  : mainTab === 'users'
+                  ? '👥 Users & Access Management'
+                  : mainTab === 'general'
+                  ? '🔐 Web Projects Vault'
+                  : '⛏️ Minecraft Server Vault'}
+              </h1>
 
-              {isLoading ? (
-                <div className={styles.grid}>
-                  {[1, 2, 3].map((n) => (
-                    <div key={n} className={styles.skeleton} />
-                  ))}
-                </div>
-              ) : projects.length === 0 ? (
-                <div className={styles.emptyState}>
-                  <svg className={styles.emptyIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                  </svg>
-                  <h3 className={styles.emptyTitle}>No Projects Found</h3>
-                  <p className={styles.emptyText}>
-                    There are currently no items in your Firestore 'projects' collection.
-                  </p>
-                </div>
-              ) : (
-                <div className={styles.grid}>
-                  {projects.map((project) => (
-                    <ProjectCard
-                      key={project.id}
-                      project={project}
-                      masterPassword={masterPassword}
-                      onDelete={handleDelete}
-                    />
-                  ))}
-                </div>
-              )}
+              <p className={styles.pageSubtitle}>
+                {mainTab === 'daily_workspace'
+                  ? 'Productivity & Morning Routine Dashboard'
+                  : mainTab === 'devices'
+                  ? 'Manage enrolled Windows PCs running Elyx Agent'
+                  : mainTab === 'terminal'
+                  ? 'Interactive PowerShell PTY session over Tailscale'
+                  : mainTab === 'users'
+                  ? 'Role Level Control & User Authorization'
+                  : 'Zero-Knowledge Encrypted Storage'}
+              </p>
             </div>
-          </>
-        )}
-      </main>
+          </div>
 
-      {/* Installation Guide Modal */}
+          <div className={styles.topBarRight}>
+            {access?.role && (
+              <span className={styles.roleBadge}>
+                {access.role}
+              </span>
+            )}
+
+            {masterPassword && (
+              <button
+                type="button"
+                onClick={handleLockVault}
+                className={styles.lockTopBtn}
+                title="Lock Vault"
+              >
+                <svg
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  width="16"
+                  height="16"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                  />
+                </svg>
+
+                <span>Lock Vault</span>
+              </button>
+            )}
+          </div>
+        </header>
+
+        <main className={styles.main}>
+          {mainTab === 'daily_workspace' ? (
+            <DailyWorkspace />
+          ) : mainTab === 'devices' ? (
+            <DeviceList
+              devices={devices}
+              securityEvents={securityEvents}
+              selectedDeviceId={selectedDeviceId}
+              onSelectDevice={(id) => setSelectedDeviceId(id)}
+              onConnectTerminal={(dev) => {
+                setSelectedDeviceId(dev.id);
+                setMainTab('terminal');
+              }}
+              onRegisterDevice={() => setIsEnrollModalOpen(true)}
+              onRenameDevice={handleRenameDevice}
+              onRevokeDevice={handleRevokeDevice}
+            />
+          ) : mainTab === 'terminal' ? (
+            <RemoteTerminal
+              devices={devices}
+              selectedDevice={selectedDevice}
+              onSelectDevice={(id) => setSelectedDeviceId(id)}
+              onOpenDeviceManager={() => setMainTab('devices')}
+            />
+          ) : mainTab === 'users' ? (
+            <UserManagement />
+          ) : !masterPassword ? (
+            <MasterPassModal onSubmit={handleUnlockVault} />
+          ) : (
+            <>
+              {mainTab === 'general' ? (
+                <>
+                  {access?.role !== 'viewer' && (
+                    <div className={styles.adminSection}>
+                      <AddProject masterPassword={masterPassword} />
+                    </div>
+                  )}
+
+                  <div>
+                    <div className={styles.sectionHeader}>
+                      <div>
+                        <h2 className={styles.sectionTitle}>
+                          Encrypted Projects
+                        </h2>
+
+                        <p className={styles.sectionSubtitle}>
+                          Decryption keys are generated transiently in memory
+                          and never sent to any server.
+                        </p>
+                      </div>
+
+                      <span className={styles.badge}>
+                        {projects.length}{' '}
+                        {projects.length === 1 ? 'Project' : 'Projects'}
+                      </span>
+                    </div>
+
+                    {isLoading ? (
+                      <div className={styles.grid}>
+                        {[1, 2, 3].map((number) => (
+                          <div
+                            key={number}
+                            className={styles.skeleton}
+                          />
+                        ))}
+                      </div>
+                    ) : projects.length === 0 ? (
+                      <div className={styles.emptyState}>
+                        <svg
+                          className={styles.emptyIcon}
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="1.5"
+                            d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                          />
+                        </svg>
+
+                        <h3 className={styles.emptyTitle}>
+                          No Projects Found
+                        </h3>
+
+                        <p className={styles.emptyText}>
+                          There are currently no projects available for this
+                          business.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className={styles.grid}>
+                        {projects.map((project) => (
+                          <ProjectCard
+                            key={project.id}
+                            project={project}
+                            masterPassword={masterPassword}
+                            onDelete={handleDelete}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <MinecraftVault
+                  masterPassword={masterPassword}
+                  user={user}
+                />
+              )}
+            </>
+          )}
+        </main>
+      </div>
+
       <InstallGuideModal
         isOpen={isInstallModalOpen}
         onClose={() => setIsInstallModalOpen(false)}
-        onRedownload={triggerDownload}
+      />
+
+      <DeviceEnrollmentModal
+        isOpen={isEnrollModalOpen}
+        onClose={() => setIsEnrollModalOpen(false)}
+        onRegister={handleRegisterDevice}
       />
     </div>
   );

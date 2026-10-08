@@ -2,12 +2,94 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  /* Dark Mode Variables (Default) */
+  --bg-main: #020617;
+  --bg-header: rgba(15, 23, 42, 0.75);
+  --bg-sidebar: #0b1329;
+  --bg-card: rgba(15, 23, 42, 0.85);
+  --bg-card-alt: #0f172a;
+  --bg-card-hover: rgba(30, 41, 59, 0.9);
+  --bg-input: #0f172a;
+  --bg-input-focus: #1e293b;
+  --bg-modal: #0f172a;
+  
+  --text-primary: #ffffff;
+  --text-main: #e2e8f0;
+  --text-muted: #94a3b8;
+  --text-dim: #64748b;
+  
+  --border-color: #1e293b;
+  --border-subtle: #334155;
+  --border-focus: #6366f1;
+  
+  --accent-primary: #6366f1;
+  --accent-hover: #4f46e5;
+  --accent-glow: rgba(99, 102, 241, 0.35);
+  --accent-light: rgba(99, 102, 241, 0.12);
+  
+  --shadow-main: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
+  --shadow-sidebar: 4px 0 24px rgba(0, 0, 0, 0.25);
+  --shadow-card: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme='light'] {
+  /* Light Mode Global Variables */
+  --bg-main: #f8fafc;
+  --bg-header: rgba(255, 255, 255, 0.85);
+  --bg-sidebar: #ffffff;
+  --bg-card: #ffffff;
+  --bg-card-alt: #f1f5f9;
+  --bg-card-hover: #f1f5f9;
+  --bg-input: #ffffff;
+  --bg-input-focus: #ffffff;
+  --bg-modal: #ffffff;
+  
+  --text-primary: #0f172a;
+  --text-main: #1e293b;
+  --text-muted: #475569;
+  --text-dim: #64748b;
+  
+  --border-color: #e2e8f0;
+  --border-subtle: #cbd5e1;
+  --border-focus: #4f46e5;
+  
+  --accent-primary: #4f46e5;
+  --accent-hover: #4338ca;
+  --accent-glow: rgba(79, 70, 229, 0.2);
+  --accent-light: rgba(79, 70, 229, 0.08);
+  
+  --shadow-main: 0 10px 25px -5px rgba(15, 23, 42, 0.06), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
+  --shadow-sidebar: 4px 0 24px rgba(15, 23, 42, 0.05);
+  --shadow-card: 0 4px 12px rgba(15, 23, 42, 0.06);
+}
+
 @layer base {
   body {
     margin: 0;
     padding: 0;
-    background-color: #0f172a;
-    color: #f8fafc;
+    background-color: var(--bg-main);
+    color: var(--text-main);
     font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    transition: background-color 0.25s ease, color 0.25s ease;
+  }
+
+  /* Global Scrollbar Customization */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--bg-main);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--border-subtle);
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--text-dim);
   }
 }

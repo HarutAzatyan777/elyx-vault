@@ -32,30 +32,25 @@ export const encryptData = (text, masterPassword) => {
  */
 export const decryptData = (ciphertext, masterPassword) => {
   if (!ciphertext || !masterPassword) {
-    console.error('[Crypto Error] Decryption aborted: Missing ciphertext or master password.');
     return null;
   }
 
   try {
     const bytes = CryptoJS.AES.decrypt(ciphertext, masterPassword);
     
-    // CryptoJS may return empty or non-positive sigBytes for wrong keys without throwing
     if (!bytes || bytes.sigBytes <= 0) {
-      console.error('[Crypto Error] Decryption failed: Incorrect master password or malformed data.');
       return null;
     }
 
     const decryptedText = bytes.toString(CryptoJS.enc.Utf8);
 
     if (!decryptedText) {
-      console.error('[Crypto Error] Decryption failed: Unable to parse UTF-8 string output.');
       return null;
     }
 
     return decryptedText;
   } catch (error) {
-    // Sanitized error logging without exposing sensitive inputs or raw key material
-    console.error('[Crypto Error] Decryption failed safely:', error?.message || 'Invalid ciphertext or passphrase');
     return null;
   }
 };
+

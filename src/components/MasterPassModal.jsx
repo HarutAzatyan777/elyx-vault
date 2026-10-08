@@ -4,10 +4,11 @@ import styles from './MasterPassModal.module.css';
 /**
  * Modal dialog prompting the user for their master password to decrypt vault contents.
  *
- * @param {{ onSubmit: (password: string) => void }} props
+ * @param {{ onSubmit: (password: string, remember: boolean) => void }} props
  */
 export const MasterPassModal = ({ onSubmit }) => {
   const [password, setPassword] = useState('');
+  const [remember, setRemember] = useState(true);
   const [error, setError] = useState('');
 
   const handleSubmit = (e) => {
@@ -17,7 +18,7 @@ export const MasterPassModal = ({ onSubmit }) => {
       return;
     }
     setError('');
-    onSubmit(password);
+    onSubmit(password, remember);
   };
 
   return (
@@ -46,9 +47,7 @@ export const MasterPassModal = ({ onSubmit }) => {
 
         <form onSubmit={handleSubmit} className={styles.form}>
           <div className={styles.field}>
-            <label className={styles.label}>
-              Master Password
-            </label>
+            <label className={styles.label}>Master Password / Encryption PIN</label>
             <input
               type="password"
               value={password}
@@ -60,8 +59,21 @@ export const MasterPassModal = ({ onSubmit }) => {
             {error && <p className={styles.errorText}>{error}</p>}
           </div>
 
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '4px 0 12px 0' }}>
+            <input
+              type="checkbox"
+              id="rememberPass"
+              checked={remember}
+              onChange={(e) => setRemember(e.target.checked)}
+              style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+            />
+            <label htmlFor="rememberPass" style={{ color: '#9ca3af', fontSize: '0.85rem', cursor: 'pointer' }}>
+              Remember key in this browser session (don't ask again)
+            </label>
+          </div>
+
           <button type="submit" className={styles.button}>
-            Submit
+            Unlock Vault
           </button>
         </form>
       </div>

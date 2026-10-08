@@ -1,0 +1,644 @@
+/* ==========================================================================
+   REMOTE TERMINAL & DEVICE MANAGER STYLES
+   ========================================================================== */
+
+.deviceListContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 8px 4px 48px;
+  animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.topToolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.sectionTitle {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--text-primary, #ffffff);
+  margin: 0;
+}
+
+.sectionSubtitle {
+  font-size: 0.9rem;
+  color: var(--text-secondary, #9ca3af);
+  margin: 4px 0 0 0;
+}
+
+.searchBarRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.searchInput {
+  flex: 1;
+  padding: 10px 16px;
+  background: var(--bg-card, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+  border-radius: 10px;
+  color: #ffffff;
+  font-size: 0.9rem;
+  outline: none;
+}
+
+.searchInput:focus {
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15);
+}
+
+.deviceCountBadge {
+  font-size: 0.85rem;
+  color: #a78bfa;
+  font-weight: 600;
+}
+
+.devicesGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 20px;
+}
+
+/* -------------------------------------------------------------------------- */
+/* DEVICE CARD                                                               */
+/* -------------------------------------------------------------------------- */
+
+.deviceCard {
+  background: var(--bg-card, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.deviceCard:hover {
+  transform: translateY(-2px);
+  border-color: rgba(139, 92, 246, 0.4);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);
+}
+
+.deviceCardSelected {
+  border-color: #8b5cf6 !important;
+  box-shadow: 0 0 0 2px #8b5cf6, 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+
+.deviceHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.deviceTitleArea {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.deviceIconWrapper {
+  font-size: 1.8rem;
+}
+
+.deviceName {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary, #ffffff);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.deviceSub {
+  font-size: 0.78rem;
+  color: var(--text-secondary, #9ca3af);
+}
+
+.inlineEditBtn {
+  background: transparent;
+  border: none;
+  font-size: 0.75rem;
+  cursor: pointer;
+  opacity: 0.6;
+}
+
+.inlineEditBtn:hover {
+  opacity: 1;
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+.statusOnline {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.statusOffline {
+  background: rgba(156, 163, 175, 0.15);
+  color: #9ca3af;
+}
+
+.statusDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.deviceDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 0.82rem;
+}
+
+.detailRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.detailLabel {
+  color: var(--text-secondary, #9ca3af);
+}
+
+.detailValue {
+  color: var(--text-primary, #ffffff);
+  font-weight: 600;
+  font-family: monospace;
+}
+
+.deviceFooter {
+  display: flex;
+  gap: 10px;
+}
+
+.connectBtn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px;
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.connectBtn:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.revokeBtn {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+/* -------------------------------------------------------------------------- */
+/* REMOTE TERMINAL UI                                                        */
+/* -------------------------------------------------------------------------- */
+
+.terminalWrapper {
+  display: flex;
+  flex-direction: column;
+  background: #0d0d15;
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+  border-radius: 16px;
+  overflow: hidden;
+  height: 680px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+}
+
+.terminalFullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  border-radius: 0;
+  height: 100vh;
+}
+
+.terminalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 20px;
+  background: #141422;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.headerTitleGroup {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.terminalIcon {
+  font-size: 1.4rem;
+}
+
+.headerTitle {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
+}
+
+.headerSub {
+  font-size: 0.78rem;
+  color: #9ca3af;
+}
+
+.headerControls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.deviceSelect,
+.directorySelect {
+  background: rgba(0, 0, 0, 0.4);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 0.82rem;
+  outline: none;
+}
+
+.connectBtnHeader {
+  background: #8b5cf6;
+  color: #ffffff;
+  border: none;
+  padding: 6px 16px;
+  border-radius: 8px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.disconnectBtn {
+  background: #ef4444;
+  color: #ffffff;
+  border: none;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.iconControlBtn {
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  color: #ffffff;
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.statusBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 20px;
+  background: #11111c;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 0.8rem;
+}
+
+.statusLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.statusDotConnected {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 8px #10b981;
+}
+
+.statusDotDisconnected {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ef4444;
+}
+
+.statusText {
+  font-weight: 600;
+  color: #d1d5db;
+}
+
+.sessionTimerPill {
+  color: #10b981;
+  font-family: monospace;
+  font-weight: 700;
+}
+
+.statusErrorAlert {
+  color: #ef4444;
+  font-weight: 500;
+}
+
+.linkBtn {
+  background: transparent;
+  border: none;
+  color: #8b5cf6;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.xtermContainer {
+  flex: 1;
+  padding: 12px;
+  background: #0d0d15;
+  overflow: hidden;
+}
+
+/* -------------------------------------------------------------------------- */
+/* ACCESSORY TOOLBAR FOR MOBILE/TOUCH                                        */
+/* -------------------------------------------------------------------------- */
+
+.terminalToolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: #141422;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  overflow-x: auto;
+}
+
+.toolbarKeyBtn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.toolbarKeyDanger {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #ef4444;
+}
+
+.arrowGroup {
+  display: flex;
+  gap: 4px;
+}
+
+/* -------------------------------------------------------------------------- */
+/* MODAL DIALOG                                                               */
+/* -------------------------------------------------------------------------- */
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(6px);
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.modalContent {
+  background: #181825;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 520px;
+  padding: 24px;
+  color: #ffffff;
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.modalTitle {
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.modalCloseBtn {
+  background: transparent;
+  border: none;
+  color: #9ca3af;
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+.modalForm {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.formRow {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 12px;
+}
+
+.formLabel {
+  font-size: 0.82rem;
+  color: #d1d5db;
+  font-weight: 600;
+}
+
+.formInput {
+  padding: 9px 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: #ffffff;
+  font-size: 0.88rem;
+  outline: none;
+}
+
+.agentInstructionBox {
+  background: rgba(139, 92, 246, 0.1);
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 0.82rem;
+  color: #d1d5db;
+}
+
+.agentInstructionBox h4 {
+  margin: 0 0 6px 0;
+  color: #a78bfa;
+}
+
+.agentInstructionBox ol {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.modalFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.primaryBtn,
+.secondaryBtn {
+  padding: 9px 18px;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.primaryBtn {
+  background: #8b5cf6;
+  color: #ffffff;
+  border: none;
+}
+
+.secondaryBtn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+.auditEventsBox {
+  background: var(--bg-card, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  border-radius: 14px;
+  padding: 18px 22px;
+}
+
+.auditTitle {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0 0 12px 0;
+}
+
+.eventsList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.eventRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.82rem;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.eventTypeTag {
+  background: rgba(139, 92, 246, 0.15);
+  color: #a78bfa;
+  font-weight: 700;
+  font-size: 0.72rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.eventText {
+  flex: 1;
+  color: #d1d5db;
+}
+
+.eventTime {
+  color: #9ca3af;
+  font-size: 0.76rem;
+}
+
+.emptyDevicesBox {
+  text-align: center;
+  padding: 42px 20px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+}
+
+.emptyIcon {
+  font-size: 2.5rem;
+  margin-bottom: 8px;
+}
+
+.emptyTitle {
+  font-size: 1.15rem;
+  color: #ffffff;
+  margin: 0 0 6px 0;
+}
+
+.emptySub {
+  font-size: 0.88rem;
+  color: #9ca3af;
+  margin: 0 0 18px 0;
+  max-width: 480px;
+  margin-left: auto;
+  margin-right: auto;
+}

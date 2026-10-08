@@ -1,0 +1,14 @@
+{
+  "deviceName": "Home PC - Windows",
+  "port": 9090,
+  "tailscaleHostname": "",
+  "allowedDirectories": [
+    "D:\\VAHAG\\elyx-vault\\elyx-vault",
+    "D:\\VAHAG\\malongo",
+    "C:\\Users\\Public\\Projects"
+  ],
+  "maxConcurrentSessions": 3,
+  "idleTimeoutSeconds": 900,
+  "maxSessionDurationSeconds": 14400,
+  "defaultShell": "powershell.exe"
+}
