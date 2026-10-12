@@ -32,6 +32,8 @@ import { subscribeRTDBConnection } from '../services/rtdbService';
 import Sidebar from '../components/Sidebar';
 import { useOS } from '../os/index.js';
 import DesktopShell from '../os/shell/DesktopShell.jsx';
+import MobileShell from '../os/mobile/MobileShell.jsx';
+import { loadDeviceMode, saveDeviceMode } from '../os/mobile/types.js';
 
 import styles from './Dashboard.module.css';
 
@@ -114,6 +116,10 @@ export const Dashboard = () => {
   });
 
   const [isRTDBConnected, setIsRTDBConnected] = useState(false);
+  const [deviceMode, setDeviceModeState] = useState(loadDeviceMode);
+  const [viewportWidth, setViewportWidth] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth : 1200
+  );
 
   // Subscribe to Realtime Database live connection status
   useEffect(() => {
@@ -124,6 +130,17 @@ export const Dashboard = () => {
       if (typeof unsub === 'function') unsub();
     };
   }, []);
+
+  // Track responsive viewport width
+  useEffect(() => {
+    const handleResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const isMobile =
+    deviceMode === 'mobile' ||
+    (deviceMode !== 'desktop' && viewportWidth <= 768);
 
   // Keep active tab synced with URL hash and localStorage
   useEffect(() => {
@@ -251,6 +268,34 @@ export const Dashboard = () => {
   };
 
   if (isOSMode) {
+    if (isMobile) {
+      return (
+        <MobileShell
+          user={user}
+          access={access}
+          projects={projects}
+          onDeleteProject={handleDelete}
+          devices={devices}
+          securityEvents={securityEvents}
+          selectedDevice={selectedDevice}
+          selectedDeviceId={selectedDeviceId}
+          setSelectedDeviceId={setSelectedDeviceId}
+          handleRegisterDevice={handleRegisterDevice}
+          handleRenameDevice={handleRenameDevice}
+          handleRevokeDevice={handleRevokeDevice}
+          masterPassword={masterPassword}
+          handleUnlockVault={handleUnlockVault}
+          handleLockVault={handleLockVault}
+          logout={logout}
+          isRTDBConnected={isRTDBConnected}
+          onSwitchToDesktop={() => {
+            saveDeviceMode('desktop');
+            setDeviceModeState('desktop');
+          }}
+        />
+      );
+    }
+
     return (
       <DesktopShell
         user={user}
@@ -270,6 +315,10 @@ export const Dashboard = () => {
         handleLockVault={handleLockVault}
         logout={logout}
         isRTDBConnected={isRTDBConnected}
+        onSwitchToMobile={() => {
+          saveDeviceMode('mobile');
+          setDeviceModeState('mobile');
+        }}
       />
     );
   }

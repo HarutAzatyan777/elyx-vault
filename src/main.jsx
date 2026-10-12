@@ -10,6 +10,7 @@ import { runWindowManagerTests } from './os/windows/windowManager.test.js'
 import { runDockAndLauncherTests } from './os/dock/dock.test.js'
 import { runFileManagerAndIntegrationTests } from './os/files/fileManager.test.js'
 import { runVirtualDesktopsAndSnappingTests } from './os/workspaces/workspaces.test.js'
+import { runMobileOSTests } from './os/mobile/mobile.test.js'
 
 if (import.meta.env.DEV) {
   try {
@@ -20,6 +21,7 @@ if (import.meta.env.DEV) {
     runDockAndLauncherTests();
     runFileManagerAndIntegrationTests();
     runVirtualDesktopsAndSnappingTests();
+    runMobileOSTests();
   } catch (err) {
     console.error('[Tests] Error running tests:', err);
   }

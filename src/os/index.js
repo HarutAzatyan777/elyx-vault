@@ -48,4 +48,5 @@ export { CommandPalette } from './launcher/CommandPalette.jsx';
 export { FileManager } from './files/FileManager.jsx';
 export { SystemSettingsApp } from './settings/SystemSettingsApp.jsx';
 export { ExtensionToolsApp } from './settings/ExtensionToolsApp.jsx';
+export { MobileShell } from './mobile/MobileShell.jsx';
 

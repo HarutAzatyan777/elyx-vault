@@ -1,0 +1,19 @@
+{
+  "name": "Elyx OS 1.0 — Personal Cloud Operating System",
+  "short_name": "Elyx OS",
+  "description": "Your Personal Cloud Operating System with Zero-Knowledge encryption.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#030712",
+  "theme_color": "#030712",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

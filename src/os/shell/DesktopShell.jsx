@@ -37,6 +37,7 @@ export function DesktopShell({
   handleLockVault,
   logout,
   isRTDBConnected = false,
+  onSwitchToMobile,
 }) {
   const {
     toggleOSMode,
@@ -442,16 +443,30 @@ export function DesktopShell({
             {/* System Environment */}
             <div className={styles.settingsSection}>
               <h3 className={styles.settingsSectionTitle}>System Environment</h3>
-              <button
-                type="button"
-                className={styles.classicSwitchBtn}
-                onClick={() => {
-                  toggleOSMode();
-                  setIsSettingsOpen(false);
-                }}
-              >
-                ⚡ Switch to Classic Dashboard
-              </button>
+              <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                <button
+                  type="button"
+                  className={styles.classicSwitchBtn}
+                  style={{ flex: 1 }}
+                  onClick={() => {
+                    toggleOSMode();
+                    setIsSettingsOpen(false);
+                  }}
+                >
+                  ⚡ Classic Dashboard
+                </button>
+                <button
+                  type="button"
+                  className={styles.classicSwitchBtn}
+                  style={{ flex: 1, background: 'rgba(99, 102, 241, 0.25)', borderColor: '#6366f1' }}
+                  onClick={() => {
+                    onSwitchToMobile?.();
+                    setIsSettingsOpen(false);
+                  }}
+                >
+                  📱 Mobile OS Experience
+                </button>
+              </div>
             </div>
           </div>
         </div>

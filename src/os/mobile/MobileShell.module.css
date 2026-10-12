@@ -1,0 +1,1337 @@
+/* ==========================================================================
+   Elyx OS 1.0 — Dedicated Mobile Shell Styles (iOS & Android Themes)
+   ========================================================================== */
+
+.mobileRoot {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--elyx-canvas-base, #030712);
+  color: #f8fafc;
+  overflow: hidden;
+  user-select: none;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Roboto', 'Inter', sans-serif;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+/* Wallpaper layer */
+.mobileWallpaper {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  pointer-events: none;
+}
+
+/* --------------------------------------------------------------------------
+   STATUS BAR
+   -------------------------------------------------------------------------- */
+.statusBar {
+  position: relative;
+  z-index: 100;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.statusLeft {
+  display: flex;
+  align-items: center;
+}
+
+.statusClock {
+  font-size: 0.92rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #ffffff;
+}
+
+.statusCenter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* iOS Dynamic Island */
+.dynamicIsland {
+  height: 26px;
+  min-width: 78px;
+  padding: 0 10px;
+  border-radius: 20px;
+  background: #000000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s cubic-bezier(0.19, 1, 0.22, 1);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+}
+
+.dynamicIslandExpanded {
+  min-width: 140px;
+  background: #0b0f19;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.islandDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.islandMusic {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: #67e8f9;
+}
+
+.islandMusicWave {
+  animation: pulseWave 1s infinite alternate;
+}
+
+@keyframes pulseWave {
+  from { transform: scale(0.9); }
+  to { transform: scale(1.1); }
+}
+
+.islandMusicTitle {
+  max-width: 90px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Android Punch-hole Camera */
+.punchHoleCamera {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #000000;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.statusRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: #ffffff;
+}
+
+.statusIconBadge {
+  font-size: 0.65rem;
+}
+
+.badgeOnline {
+  color: #10b981;
+}
+
+.badgeOffline {
+  color: #ef4444;
+}
+
+.statusVaultBtn {
+  background: transparent;
+  border: none;
+  font-size: 0.82rem;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.statusSignal {
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.batteryIcon {
+  width: 22px;
+  height: 11px;
+  border: 1.5px solid #ffffff;
+  border-radius: 3px;
+  padding: 1px;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.batteryIcon::after {
+  content: '';
+  position: absolute;
+  right: -3.5px;
+  top: 2.5px;
+  width: 2px;
+  height: 4px;
+  background: #ffffff;
+  border-radius: 0 1px 1px 0;
+}
+
+.batteryLevel {
+  width: 80%;
+  height: 100%;
+  background: #10b981;
+  border-radius: 1px;
+}
+
+/* --------------------------------------------------------------------------
+   HOME SCREEN
+   -------------------------------------------------------------------------- */
+.homeScreen {
+  position: relative;
+  z-index: 10;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 0.75rem 1.25rem 1rem;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.homeWidgetSection {
+  margin-bottom: 1rem;
+}
+
+.widgetCard {
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(24px) saturate(190%);
+  -webkit-backdrop-filter: blur(24px) saturate(190%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  padding: 1rem 1.15rem;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.homeScreenAndroid .widgetCard {
+  border-radius: 28px;
+  background: rgba(30, 41, 59, 0.85);
+  border: 1px solid rgba(139, 92, 246, 0.25);
+}
+
+.widgetHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.widgetDate {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.widgetBadge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: rgba(99, 102, 241, 0.2);
+  color: #a5b4fc;
+}
+
+.widgetBody {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.widgetTitle {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.widgetSubtitle {
+  font-size: 0.8rem;
+  color: #cbd5e1;
+  margin: 0;
+  line-height: 1.35;
+}
+
+.widgetActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.widgetActionBtn {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #f8fafc;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.widgetActionBtn:hover {
+  background: rgba(99, 102, 241, 0.3);
+  border-color: #6366f1;
+}
+
+/* Search Bar */
+.searchSection {
+  margin-bottom: 1.25rem;
+}
+
+.searchBarWrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 14px;
+  padding: 0 12px;
+  height: 42px;
+}
+
+.homeScreenAndroid .searchBarWrapper {
+  border-radius: 28px;
+  background: rgba(30, 41, 59, 0.9);
+}
+
+.searchIcon {
+  font-size: 0.9rem;
+  opacity: 0.7;
+}
+
+.searchInput {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 0.88rem;
+  color: #ffffff;
+}
+
+.searchInput::placeholder {
+  color: #94a3b8;
+}
+
+.searchClearBtn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+/* App Grid Section */
+.appGridSection {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.25rem 0.5rem;
+  justify-items: center;
+  margin-bottom: auto;
+}
+
+.appIconContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  touch-action: manipulation;
+  width: 72px;
+  text-align: center;
+}
+
+.appIconContainer:active {
+  transform: scale(0.92);
+  transition: transform 0.12s ease;
+}
+
+.appIconBadge {
+  width: 58px;
+  height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.7rem;
+  position: relative;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35);
+}
+
+.appIconIOS {
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.appIconAndroid {
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.appLockBadge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  font-size: 0.75rem;
+  background: rgba(15, 23, 42, 0.9);
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.appLabel {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: #f1f5f9;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 68px;
+}
+
+/* Folder Icon */
+.folderIconBadge {
+  width: 58px;
+  height: 58px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35);
+}
+
+.folderMiniGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
+  width: 100%;
+  height: 100%;
+}
+
+.folderMiniDot {
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+}
+
+.drawerTriggerBadge {
+  background: linear-gradient(135deg, #8b5cf6, #3b82f6) !important;
+  color: #ffffff;
+  font-size: 1.2rem;
+}
+
+/* Bottom Mobile Dock */
+.mobileDock {
+  margin-top: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 10px 16px;
+  flex-shrink: 0;
+}
+
+.dockIOS {
+  background: rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(30px) saturate(200%);
+  -webkit-backdrop-filter: blur(30px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 28px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+
+.dockAndroid {
+  background: rgba(30, 41, 59, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 24px;
+}
+
+.dockItemBtn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  min-width: 48px;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: manipulation;
+}
+
+.dockIconBadge {
+  width: 52px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.6rem;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35);
+}
+
+/* --------------------------------------------------------------------------
+   FULLSCREEN APPLICATION VIEWPORT
+   -------------------------------------------------------------------------- */
+.appFullscreenContainer {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  background: #030712;
+  overflow: hidden;
+  animation: appSlideUp 260ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes appSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.mobileAppHeader {
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px;
+  background: rgba(15, 23, 42, 0.94);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
+  z-index: 60;
+}
+
+.mobileBackBtn {
+  background: transparent;
+  border: none;
+  color: #6366f1;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.iosBackChevron {
+  color: #818cf8;
+}
+
+.androidBackArrow {
+  font-size: 1.25rem;
+  color: #ffffff;
+}
+
+.mobileHeaderCenter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.mobileHeaderAppBadge {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.mobileHeaderAppTitle {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mobileHeaderRight {
+  display: flex;
+  align-items: center;
+  min-width: 44px;
+  justify-content: flex-end;
+}
+
+.mobileHeaderLockBtn {
+  background: transparent;
+  border: none;
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 8px;
+}
+
+.mobileAppBody {
+  flex: 1;
+  position: relative;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: calc(env(safe-area-inset-bottom, 16px) + 54px);
+}
+
+/* Locked view inside app */
+.mobileLockedContainer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 2rem 1.5rem;
+}
+
+.mobileLockedCard {
+  background: rgba(15, 23, 42, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  padding: 1.75rem;
+  text-align: center;
+  width: 100%;
+  max-width: 360px;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.5);
+}
+
+.mobileLockedIcon {
+  font-size: 2.8rem;
+  margin-bottom: 0.5rem;
+}
+
+.mobileLockedTitle {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 0.4rem;
+}
+
+.mobileLockedSubtitle {
+  font-size: 0.85rem;
+  color: #94a3b8;
+  line-height: 1.4;
+  margin-bottom: 1.25rem;
+}
+
+/* Mobile Projects view */
+.mobileProjectsModule {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.mobileAddProject {
+  margin-bottom: 0.5rem;
+}
+
+.mobileProjectsHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mobileCountBadge {
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: rgba(99, 102, 241, 0.2);
+  color: #818cf8;
+}
+
+.mobileEmptyText {
+  color: #94a3b8;
+  font-size: 0.85rem;
+  text-align: center;
+  padding: 2rem 0;
+}
+
+.mobileProjectsList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mobileLoadingText,
+.mobileGenericApp {
+  padding: 2rem;
+  text-align: center;
+  color: #94a3b8;
+}
+
+/* --------------------------------------------------------------------------
+   BOTTOM NAVIGATION
+   -------------------------------------------------------------------------- */
+.gestureBarContainer {
+  position: relative;
+  z-index: 100;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.gestureIndicatorPill {
+  width: 135px;
+  height: 5px;
+  border-radius: 100px;
+  background: rgba(255, 255, 255, 0.7);
+  transition: all 0.2s ease;
+}
+
+.gestureIndicatorPill:hover,
+.gestureIndicatorPill:active {
+  background: #ffffff;
+  transform: scaleY(1.3);
+}
+
+.threeButtonBar {
+  position: relative;
+  z-index: 100;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  background: rgba(15, 23, 42, 0.95);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+.threeBtn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  padding: 10px 24px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  min-height: 48px;
+}
+
+.threeBtn:active {
+  color: #ffffff;
+}
+
+/* --------------------------------------------------------------------------
+   APP DRAWER (ANDROID STYLE)
+   -------------------------------------------------------------------------- */
+.drawerOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  animation: fadeIn 0.18s ease;
+}
+
+.drawerSheet {
+  background: rgba(15, 23, 42, 0.96);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 28px 28px 0 0;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem 1.25rem 2rem;
+  animation: slideSheetUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes slideSheetUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.drawerHandle {
+  width: 44px;
+  height: 5px;
+  border-radius: 100px;
+  background: rgba(255, 255, 255, 0.3);
+  margin: 0 auto 1rem;
+  cursor: pointer;
+}
+
+.drawerSearchWrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 24px;
+  padding: 0 14px;
+  height: 42px;
+  margin-bottom: 1rem;
+}
+
+.drawerSearchInput {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 0.9rem;
+  color: #ffffff;
+}
+
+.drawerList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  max-height: 60vh;
+}
+
+.drawerListItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.drawerListItem:hover {
+  background: rgba(99, 102, 241, 0.2);
+}
+
+.drawerItemIcon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  flex-shrink: 0;
+}
+
+.drawerItemInfo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.drawerItemTitle {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.drawerItemDesc {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.drawerItemChevron {
+  font-size: 1.2rem;
+  color: #64748b;
+}
+
+/* --------------------------------------------------------------------------
+   QUICK SETTINGS SHADE
+   -------------------------------------------------------------------------- */
+.quickSettingsOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  animation: fadeIn 0.18s ease;
+}
+
+.quickSettingsSheet {
+  background: rgba(15, 23, 42, 0.96);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 0 0 28px 28px;
+  padding: 1.25rem 1.25rem 1.75rem;
+  animation: slideSheetDown 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes slideSheetDown {
+  from { transform: translateY(-100%); }
+  to { transform: translateY(0); }
+}
+
+.quickUserCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 1.25rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.quickAvatarCircle {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1, #06b6d4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.quickUserInfo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.quickUserName {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.quickUserEmail {
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.quickCloseBtn {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  color: #cbd5e1;
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+.quickTilesGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 1.25rem;
+}
+
+.quickTile {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 18px;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  min-height: 58px;
+}
+
+.quickTile:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.tileActive {
+  background: rgba(99, 102, 241, 0.25) !important;
+  border-color: #6366f1 !important;
+}
+
+.tileWarning {
+  background: rgba(245, 158, 11, 0.25) !important;
+  border-color: #f59e0b !important;
+}
+
+.tileIcon {
+  font-size: 1.3rem;
+}
+
+.tileTexts {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.tileLabel {
+  font-size: 0.74rem;
+  color: #94a3b8;
+}
+
+.tileValue {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.quickSettingsFooter {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.quickLogoutBtn {
+  padding: 8px 16px;
+  border-radius: 12px;
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* --------------------------------------------------------------------------
+   MULTITASKING APP SWITCHER
+   -------------------------------------------------------------------------- */
+.switcherOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.switcherContent {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.switcherTopBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.switcherHeading {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.switcherClearBtn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  color: #cbd5e1;
+  font-size: 0.78rem;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+
+.switcherDeck {
+  display: flex;
+  gap: 1rem;
+  overflow-x: auto;
+  padding: 0.5rem 0.2rem 1rem;
+  scrollbar-width: none;
+}
+
+.switcherCard {
+  flex: 0 0 220px;
+  height: 320px;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  border-radius: 22px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.switcherCard:hover {
+  transform: translateY(-6px);
+  border-color: #6366f1;
+}
+
+.switcherCardActive {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px #6366f1, 0 16px 40px rgba(99, 102, 241, 0.4);
+}
+
+.switcherCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.switcherCardAppInfo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.switcherCardBadge {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+}
+
+.switcherCardTitle {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.switcherCardCloseBtn {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  color: #94a3b8;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.switcherCardCloseBtn:hover {
+  background: rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+}
+
+.switcherCardBody {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 50% 20%, rgba(30, 41, 59, 0.6), rgba(15, 23, 42, 0.9));
+}
+
+.switcherCardMockup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.switcherMockupIcon {
+  font-size: 3rem;
+  opacity: 0.8;
+}
+
+.switcherMockupDesc {
+  font-size: 0.78rem;
+  color: #94a3b8;
+}
+
+.switcherEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  color: #94a3b8;
+  gap: 8px;
+}
+
+.switcherEmptyIcon {
+  font-size: 2.5rem;
+  opacity: 0.6;
+}
+
+/* --------------------------------------------------------------------------
+   FOLDER & CONTEXT ACTION MODALS
+   -------------------------------------------------------------------------- */
+.folderOverlay,
+.contextOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.folderModalCard {
+  background: rgba(15, 23, 42, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 28px;
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 320px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+  animation: scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes scaleIn {
+  from { transform: scale(0.9); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.folderModalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+}
+
+.folderModalTitle {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
+}
+
+.folderCloseBtn {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  color: #cbd5e1;
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+.folderGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  justify-items: center;
+}
+
+.contextSheet {
+  background: rgba(15, 23, 42, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 20px;
+  padding: 1.25rem;
+  width: 100%;
+  max-width: 280px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  animation: scaleIn 0.15s ease forwards;
+}
+
+.contextHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.contextIcon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+}
+
+.contextTitle {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
+}
+
+.contextCategory {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  margin: 0;
+}
+
+.contextActions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.contextActionItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: transparent;
+  border: none;
+  color: #f1f5f9;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.contextActionItem:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
