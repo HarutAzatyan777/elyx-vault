@@ -42,10 +42,27 @@ service cloud.firestore {
         && (access().role in ['owner', 'manager', 'member'] || isOwner());
     }
 
+    function authEmail() {
+      return (signedIn() && request.auth.token.email is string)
+        ? request.auth.token.email.lower()
+        : '';
+    }
+
     function verifiedEmail() {
       return signedIn()
         && request.auth.token.email is string
-        && request.auth.token.email_verified == true;
+        && (
+          request.auth.token.email_verified == true
+          || request.auth.token.firebase.sign_in_provider == 'password'
+          || request.auth.token.firebase.sign_in_provider == 'google.com'
+        );
+    }
+
+    function isInvitationForUser(docId, docData) {
+      return authEmail() != '' && (
+        docId.lower() == authEmail()
+        || (docData != null && docData.email is string && docData.email.lower() == authEmail())
+      );
     }
 
     /*
@@ -62,17 +79,51 @@ service cloud.firestore {
      */
 
     match /userAccess/{uid} {
-      allow read, get, list: if signedIn() && (
+      allow read, get: if signedIn() && (
         uid == request.auth.uid
         || isManager()
       );
 
-      allow create, update: if signedIn() && (
-        (uid == request.auth.uid && verifiedEmail())
-        || isManager()
+      allow list: if isManager();
+
+      allow create: if signedIn() && (
+        // Managers can provision users (only Owner can grant 'owner' role)
+        (isManager() && (request.resource.data.role != 'owner' || isOwner()))
+        // DeveloperHar bootstrap
+        || (uid == request.auth.uid && authEmail().matches('.*developerhar.*') && request.resource.data.role == 'owner')
+        // Invited user claiming their own invitation
+        || (
+          uid == request.auth.uid
+          && authEmail() != ''
+          && request.resource.data.email is string
+          && request.resource.data.email.lower() == authEmail()
+          && exists(/databases/$(database)/documents/invitations/$(authEmail()))
+          && get(/databases/$(database)/documents/invitations/$(authEmail())).data.role == request.resource.data.role
+          && (
+            !('businessId' in get(/databases/$(database)/documents/invitations/$(authEmail())).data)
+            || get(/databases/$(database)/documents/invitations/$(authEmail())).data.businessId == request.resource.data.businessId
+          )
+        )
       );
 
-      allow delete: if isManager();
+      allow update: if signedIn() && (
+        // Owner can update any user's role
+        isOwner()
+        // Manager can update member/viewer/manager roles, but cannot touch owner
+        || (isManager() && request.resource.data.role != 'owner' && resource.data.role != 'owner')
+        // Normal user can only update their profile metadata, never role/businessId/email
+        || (
+          uid == request.auth.uid
+          && request.resource.data.role == resource.data.role
+          && request.resource.data.businessId == resource.data.businessId
+          && request.resource.data.email == resource.data.email
+        )
+      );
+
+      allow delete: if signedIn() && (
+        isOwner()
+        || (isManager() && resource.data.role != 'owner')
+      );
     }
 
     /*
@@ -80,15 +131,40 @@ service cloud.firestore {
      */
 
     match /invitations/{email} {
-
-      allow read, get, list: if signedIn() && (
-        (verifiedEmail() && email == request.auth.token.email.lower())
-        || isManager()
+      allow read, get: if signedIn() && (
+        isManager()
+        || isInvitationForUser(email, resource.data)
       );
 
-      allow create, update, delete: if isManager() || (
-        verifiedEmail()
-        && email == request.auth.token.email.lower()
+      allow list: if isManager() || (signedIn() && authEmail() != '');
+
+      // Only Managers and Owners can create invitations (Managers cannot invite an 'owner')
+      allow create: if signedIn() && (
+        isOwner()
+        || (isManager() && request.resource.data.role != 'owner')
+      );
+
+      // Only Managers and Owners can delete/cancel invitations
+      allow delete: if signedIn() && (
+        isOwner()
+        || (isManager() && resource.data.role != 'owner')
+      );
+
+      // Managers can update invitations.
+      // An invited user may ONLY accept their pending invitation without altering role/businessId/email.
+      allow update: if signedIn() && (
+        isOwner()
+        || (isManager() && request.resource.data.role != 'owner' && resource.data.role != 'owner')
+        || (
+          isInvitationForUser(email, resource.data)
+          && request.resource.data.role == resource.data.role
+          && request.resource.data.email == resource.data.email
+          && (
+            !('businessId' in resource.data)
+            || request.resource.data.businessId == resource.data.businessId
+          )
+          && request.resource.data.status in ['accepted', 'pending']
+        )
       );
     }
 
@@ -223,6 +299,74 @@ service cloud.firestore {
           : resource.data.uid == request.auth.uid
       );
       allow update, delete: if false; // Security events cannot be forged or deleted by clients
+    }
+
+    /*
+     * MUSIC VAULT
+     */
+    match /music_vault/{trackId} {
+      allow read: if signedIn() && (
+        resource == null
+        || resource.data.uid == request.auth.uid
+        || isOwner()
+        || (resource.data.businessId != null && isBusinessMember(resource.data.businessId))
+      );
+      allow write: if signedIn() && (
+        resource == null
+          ? (request.resource.data.uid == request.auth.uid || isOwner())
+          : (resource.data.uid == request.auth.uid || isOwner())
+      );
+    }
+
+    /*
+     * MUSIC FOLDERS
+     */
+    match /music_folders/{folderId} {
+      allow read: if signedIn() && (
+        resource == null
+        || resource.data.uid == request.auth.uid
+        || isOwner()
+        || (resource.data.businessId != null && isBusinessMember(resource.data.businessId))
+      );
+      allow write: if signedIn() && (
+        resource == null
+          ? (request.resource.data.uid == request.auth.uid || isOwner())
+          : (resource.data.uid == request.auth.uid || isOwner())
+      );
+    }
+
+    /*
+     * MEDIA VAULT
+     */
+    match /media_vault/{mediaId} {
+      allow read: if signedIn() && (
+        resource == null
+        || resource.data.uid == request.auth.uid
+        || isOwner()
+        || (resource.data.businessId != null && isBusinessMember(resource.data.businessId))
+      );
+      allow write: if signedIn() && (
+        resource == null
+          ? (request.resource.data.uid == request.auth.uid || isOwner())
+          : (resource.data.uid == request.auth.uid || isOwner())
+      );
+    }
+
+    /*
+     * USER NOTES
+     */
+    match /user_notes/{noteId} {
+      allow read: if signedIn() && (
+        resource == null
+        || resource.data.uid == request.auth.uid
+        || isOwner()
+        || (resource.data.businessId != null && isBusinessMember(resource.data.businessId))
+      );
+      allow write: if signedIn() && (
+        resource == null
+          ? (request.resource.data.uid == request.auth.uid || isOwner())
+          : (resource.data.uid == request.auth.uid || isOwner())
+      );
     }
 
     /*

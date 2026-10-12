@@ -1,0 +1,26 @@
+rules_version = '2';
+
+// Craft rules based on data in your Firestore database
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Media vault items (Images and Videos)
+    match /media/{uid}/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null || uid == 'public';
+      allow delete: if request.auth != null || uid == 'public';
+    }
+
+    // Music vault items (Audio tracks, songs, playlists)
+    match /music/{uid}/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null || uid == 'public';
+      allow delete: if request.auth != null || uid == 'public';
+    }
+
+    // General fallback rule
+    match /{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+  }
+}

@@ -7,7 +7,6 @@ import {
   deletePreset,
   endWorkspaceSession,
   logActivity,
-  seedDefaultsIfEmpty,
   startWorkspaceSession,
   subscribeToActivity,
   subscribeToActiveSession,
@@ -69,13 +68,12 @@ export function useDailyWorkspace() {
           uid,
           (data) => {
             setPresets(data);
-            if (data.length === 0) {
-              // Seed defaults if empty
-              seedDefaultsIfEmpty(uid);
-            } else if (!selectedPresetId) {
+            if (!selectedPresetId && data.length > 0) {
               // Select first favorite or first preset by default
               const fav = data.find((p) => p.isFavorite) || data[0];
               setSelectedPresetId(fav?.id || null);
+            } else if (data.length === 0) {
+              setSelectedPresetId(null);
             }
             setLoading(false);
           },

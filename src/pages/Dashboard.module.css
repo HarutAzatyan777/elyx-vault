@@ -26,8 +26,13 @@
   min-height: 100vh;
   width: calc(100% - 270px);
   transition:
-    margin-left 0.3s ease,
-    width 0.3s ease;
+    margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mainWrapperCollapsed {
+  margin-left: 72px;
+  width: calc(100% - 72px);
 }
 
 /* =========================
@@ -66,6 +71,114 @@
   flex-shrink: 0;
 }
 
+/* Quick Background Audio Pill */
+.audioTopPill {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border-color);
+  padding: 0.25rem 0.5rem 0.25rem 0.35rem;
+  border-radius: 9999px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transition: all 0.2s ease;
+  max-width: 250px;
+}
+
+.audioTopPill:hover {
+  border-color: #06b6d4;
+  box-shadow: 0 2px 12px rgba(6, 182, 212, 0.2);
+}
+
+.audioPillDisc {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  overflow: hidden;
+  position: relative;
+  cursor: pointer;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.audioPillPlaying {
+  animation: spinPill 4s linear infinite;
+}
+
+@keyframes spinPill {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.audioPillImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.audioPillInfo {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.audioPillTitle {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100px;
+  line-height: 1.2;
+}
+
+.audioPillArtist {
+  font-size: 0.64rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100px;
+  line-height: 1.1;
+}
+
+.audioPillBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: none;
+  background: var(--bg-card);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.audioPillBtn:hover {
+  background: #06b6d4;
+  color: #ffffff;
+  transform: scale(1.08);
+}
+
+.audioPillStopBtn {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+}
+
+.audioPillStopBtn:hover {
+  background: #ef4444;
+  color: #ffffff;
+}
+
 .menuBtn {
   display: none;
   align-items: center;
@@ -82,6 +195,25 @@
 .menuBtn:hover {
   background-color: var(--bg-card-hover);
   border-color: var(--border-subtle);
+}
+
+.desktopCollapseBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.desktopCollapseBtn:hover {
+  background-color: var(--bg-card-hover);
+  border-color: var(--border-subtle);
+  color: #6366f1;
 }
 
 .pageTitle {
@@ -275,7 +407,8 @@
 }
 
 @media (max-width: 1024px) {
-  .mainWrapper {
+  .mainWrapper,
+  .mainWrapperCollapsed {
     margin-left: 0;
     width: 100%;
   }
@@ -283,11 +416,19 @@
   .menuBtn {
     display: flex;
   }
+
+  .desktopCollapseBtn {
+    display: none;
+  }
 }
 
 @media (max-width: 768px) {
   .topBar {
     padding: 0.875rem 1rem;
+  }
+
+  .audioPillInfo {
+    display: none;
   }
 
   .main {
@@ -317,6 +458,33 @@
   .lockTopBtn {
     padding: 0.5rem;
   }
+}
+
+.rtdbBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.1);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  padding: 0.35rem 0.65rem;
+  border-radius: 9999px;
+  user-select: none;
+}
+
+.rtdbDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: #94a3b8;
+  transition: all 0.3s ease;
+}
+
+.rtdbOnline {
+  background-color: #10b981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.8);
 }
 
 @media (max-width: 520px) {

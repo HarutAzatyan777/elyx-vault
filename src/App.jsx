@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './hooks/useAuth.jsx';
 import { ThemeProvider } from './context/ThemeContext';
+import { MusicProvider } from './context/MusicContext';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 
@@ -57,9 +58,11 @@ export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
+        <MusicProvider>
+          <BrowserRouter>
+            <AppRoutes />
+          </BrowserRouter>
+        </MusicProvider>
       </AuthProvider>
     </ThemeProvider>
   );

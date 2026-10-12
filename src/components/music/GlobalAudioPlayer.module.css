@@ -1,0 +1,564 @@
+/* ==========================================================================
+   GLOBAL AUDIO PLAYER (SPOTIFY STYLE FLOATING BAR)
+   ========================================================================== */
+
+.playerBar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 72px;
+  background: rgba(11, 19, 41, 0.95);
+  border-top: 1px solid var(--border-color);
+  backdrop-filter: blur(16px);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 -10px 25px rgba(0, 0, 0, 0.4);
+  animation: slideUpPlayer 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideUpPlayer {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* PROGRESS BAR                                                               */
+/* -------------------------------------------------------------------------- */
+
+.progressBarWrapper {
+  position: relative;
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  transition: height 0.15s;
+}
+
+.progressBarWrapper:hover {
+  height: 6px;
+}
+
+.progressFill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, #06b6d4 0%, #3b82f6 100%);
+  pointer-events: none;
+  box-shadow: 0 0 8px rgba(6, 182, 212, 0.6);
+}
+
+.rangeInput {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 10;
+  margin: 0;
+}
+
+/* -------------------------------------------------------------------------- */
+/* INNER LAYOUT                                                               */
+/* -------------------------------------------------------------------------- */
+
+.playerInner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1.5rem;
+  height: calc(100% - 4px);
+  gap: 1rem;
+}
+
+/* -------------------------------------------------------------------------- */
+/* LEFT: TRACK INFO & VINYL                                                   */
+/* -------------------------------------------------------------------------- */
+
+.trackInfo {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  min-width: 200px;
+  max-width: 300px;
+  cursor: pointer;
+}
+
+.artWrapper {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  flex-shrink: 0;
+}
+
+.coverImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.vinylCenter {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #000000;
+  border: 2px solid #ffffff;
+}
+
+.artPlaying {
+  animation: spinVinyl 6s linear infinite;
+}
+
+@keyframes spinVinyl {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.textWrapper {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.artist {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Equalizer Visualizer Bars */
+.eqBars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+.eqBar {
+  width: 2px;
+  background: #06b6d4;
+  border-radius: 1px;
+  animation: bounceBar 0.8s ease-in-out infinite alternate;
+}
+
+.eqBar:nth-child(1) {
+  height: 60%;
+  animation-delay: 0.1s;
+}
+
+.eqBar:nth-child(2) {
+  height: 100%;
+  animation-delay: 0.3s;
+}
+
+.eqBar:nth-child(3) {
+  height: 40%;
+  animation-delay: 0.5s;
+}
+
+@keyframes bounceBar {
+  from {
+    height: 20%;
+  }
+  to {
+    height: 100%;
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* CENTER: CONTROLS                                                           */
+/* -------------------------------------------------------------------------- */
+
+.centerControls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.btnRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.controlBtn,
+.smallBtn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.controlBtn:hover,
+.smallBtn:hover {
+  color: #ffffff;
+  transform: scale(1.1);
+}
+
+.smallBtn {
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+
+.btnActive {
+  color: #06b6d4 !important;
+  opacity: 1 !important;
+}
+
+.mainPlayBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #0f172a;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.3);
+  transition: all 0.18s;
+}
+
+.mainPlayBtn:hover {
+  transform: scale(1.08);
+  background: #06b6d4;
+  color: #ffffff;
+}
+
+.timeRow {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.68rem;
+  color: var(--text-dim);
+}
+
+.timeDivider {
+  opacity: 0.5;
+}
+
+/* -------------------------------------------------------------------------- */
+/* RIGHT: VOLUME & EXPAND                                                     */
+/* -------------------------------------------------------------------------- */
+
+.rightControls {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  min-width: 150px;
+  justify-content: flex-end;
+}
+
+.volumeBox {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.volumeBtn {
+  background: transparent;
+  border: none;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.volumeSlider {
+  width: 75px;
+  height: 4px;
+  accent-color: #06b6d4;
+  cursor: pointer;
+}
+
+.expandBtn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text-muted);
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.2s;
+}
+
+.expandBtn:hover {
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+}
+
+.closePlayerBtn {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.28);
+  color: #fca5a5;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.closePlayerBtn:hover {
+  background: rgba(239, 68, 68, 0.3);
+  border-color: #ef4444;
+  color: #ffffff;
+  transform: scale(1.06);
+}
+
+/* -------------------------------------------------------------------------- */
+/* EXPANDED CINEMA VIEW                                                       */
+/* -------------------------------------------------------------------------- */
+
+.expandedBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 7, 16, 0.94);
+  backdrop-filter: blur(16px);
+  z-index: 2500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.expandedCard {
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  padding: 2.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 440px;
+  width: 100%;
+  position: relative;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7);
+}
+
+.expandedTopBar {
+  position: absolute;
+  top: 1rem;
+  left: 1.25rem;
+  right: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.expandedStopBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
+  font-size: 0.76rem;
+  font-weight: 600;
+  padding: 0.35rem 0.65rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.expandedStopBtn:hover {
+  background: rgba(239, 68, 68, 0.3);
+  color: #ffffff;
+  border-color: #ef4444;
+}
+
+.closeExpandedBtn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.6rem;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.closeExpandedBtn:hover {
+  color: #ffffff;
+}
+
+.vinylShowcase {
+  margin-bottom: 1.5rem;
+}
+
+.bigVinyl {
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 10px 35px rgba(0, 0, 0, 0.7);
+  border: 3px solid rgba(255, 255, 255, 0.2);
+}
+
+.bigVinylSpin {
+  animation: spinVinyl 6s linear infinite;
+}
+
+.bigVinylImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.vinylCenterHole {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #0f172a;
+  border: 4px solid #ffffff;
+}
+
+.expandedMeta {
+  text-align: center;
+  margin-bottom: 1.25rem;
+}
+
+.expandedTitle {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.expandedArtist {
+  margin: 0.3rem 0 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.bigScrubberBox {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 1.5rem;
+}
+
+.scrubberTimeRow {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.76rem;
+  color: var(--text-dim);
+}
+
+.bigRangeInput {
+  width: 100%;
+  height: 6px;
+  accent-color: #06b6d4;
+  cursor: pointer;
+}
+
+.bigControlsRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+.bigSmallBtn {
+  background: transparent;
+  border: none;
+  font-size: 1.1rem;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.bigNavBtn {
+  background: transparent;
+  border: none;
+  font-size: 1.5rem;
+  color: #ffffff;
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+
+.bigNavBtn:hover {
+  transform: scale(1.15);
+}
+
+.bigMainPlayBtn {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
+  border: none;
+  color: #ffffff;
+  font-size: 1.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(6, 182, 212, 0.5);
+  transition: transform 0.18s;
+}
+
+.bigMainPlayBtn:hover {
+  transform: scale(1.1);
+}
+
+@media (max-width: 600px) {
+  .playerInner {
+    padding: 0 0.85rem;
+  }
+  .volumeBox {
+    display: none;
+  }
+}

@@ -62,20 +62,28 @@ The current business-filtered queries use a single equality filter and need no c
 
 ## Manager and user flows
 
-### Manager
+### Manager / Owner
 
 1. Sign in and unlock the vault.
-2. In **Manager tools**, enter the user's Google email, select `Member` or `Viewer`, and save.
-3. Re-entering the same email with different casing updates the pending invitation rather than creating a duplicate. Accepted or cross-business invitations cannot be overwritten.
+2. In **Users & Access Management**, enter the user's email, select the assigned role level (`Manager`, `Member`, `Viewer`, or `Owner` if Super Admin), and click **Add / Update User Role**.
+3. The invitation is saved under `invitations/{normalizedEmail}` with status `pending`.
+4. In **Pending Invitations**, managers can:
+   - **Approve**: Mark invitation approved and pre-authorized for immediate sign-in.
+   - **Resend**: Re-normalize and touch invitation records if the user needs a fresh invite.
+   - **Change Role**: Adjust the assigned role before or after sign in (only Owners may grant Owner).
+   - **Direct UID Activation**: Instantly link an existing Firebase Auth user by email and UID into `userAccess`.
+   - **Cancel / Revoke (`✕`)**: Remove the invitation before acceptance.
 
 ### Invited user
 
-1. Open the app and choose **Continue with Google**.
-2. Select the exact Google account the manager invited.
-3. The app validates the verified Firebase token email against Firestore and atomically connects the UID to the invitation's business.
-4. An uninvited account remains outside the dashboard and receives a friendly access message.
-
-Email/password users remain supported, but—like Google users—they must already have `userAccess` or claim an invitation with a Firebase-verified email before entering the dashboard.
+1. Open the app and sign in with Google or Email/Password using the invited email.
+2. The app normalizes the authenticated email and matches it against `invitations/{normalizedEmail}`.
+3. Upon matching:
+   - Atomically provisions `userAccess/{uid}` with the manager-assigned role (`manager`, `member`, `viewer`, or `owner`) and tenant `businessId`.
+   - Updates the invitation status to `accepted` with `acceptedBy: uid` and timestamp.
+   - Immediately redirects the user to the active dashboard.
+4. If an authenticated user has pending access or was approved while on the sign-in screen, clicking **🔄 Re-check Invitation & Activate Access** immediately validates and activates their account without requiring re-authentication.
+5. An uninvited user remains outside the dashboard and receives an informative invitation prompt.
 
 ## Development
 

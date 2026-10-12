@@ -40,7 +40,7 @@ const getErrorMessage = (errorCode) => {
 };
 
 export const Login = () => {
-  const { user, access, loading: authLoading, accessError, loginWithGoogle, logout } = useAuth();
+  const { user, access, loading: authLoading, accessError, refreshAccess, loginWithGoogle, logout } = useAuth();
   const navigate = useNavigate();
 
   const [mode, setMode] = useState('signin'); // 'signin' | 'signup'
@@ -170,9 +170,30 @@ export const Login = () => {
         )}
 
         {user && !access && (
-          <button type="button" className={styles.switchAccountBtn} onClick={logout}>
-            Sign out and choose another account
-          </button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+            <button
+              type="button"
+              className={styles.submitBtn}
+              style={{ background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', marginTop: 0 }}
+              onClick={async () => {
+                setIsSubmitting(true);
+                try {
+                  const resolved = await refreshAccess();
+                  if (resolved) {
+                    navigate('/dashboard', { replace: true });
+                  }
+                } finally {
+                  setIsSubmitting(false);
+                }
+              }}
+              disabled={isSubmitting}
+            >
+              🔄 Re-check Invitation & Activate Access
+            </button>
+            <button type="button" className={styles.switchAccountBtn} onClick={logout}>
+              Sign out and choose another account
+            </button>
+          </div>
         )}
 
         <form onSubmit={handleSubmit} className={styles.form}>

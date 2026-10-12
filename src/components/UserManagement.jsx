@@ -4,14 +4,20 @@ import {
   deleteDoc,
   doc,
   onSnapshot,
-  runTransaction,
   serverTimestamp,
   setDoc,
   updateDoc,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../hooks/useAuth.jsx';
-import { ALL_ROLES, normalizeEmail } from '../utils/access';
+import {
+  ALL_ROLES,
+  MEMBER_ROLES,
+  ROLE_LABELS,
+  canAssignRole,
+  isValidEmail,
+  normalizeEmail,
+} from '../utils/access';
 import styles from './UserManagement.module.css';
 
 export default function UserManagement() {
@@ -23,6 +29,12 @@ export default function UserManagement() {
   const [searchQuery, setSearchQuery] = useState('');
   const [message, setMessage] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // Manual direct activation state
+  const [showDirectModal, setShowDirectModal] = useState(false);
+  const [directEmail, setDirectEmail] = useState('');
+  const [directUid, setDirectUid] = useState('');
+  const [directRole, setDirectRole] = useState('manager');
 
   const isOwner =
     access?.role === 'owner' ||
@@ -64,7 +76,16 @@ export default function UserManagement() {
     if (event) event.preventDefault();
     const targetEmail = normalizeEmail(email);
     setMessage(null);
-    if (!targetEmail || !ALL_ROLES.includes(role)) return;
+
+    if (!isValidEmail(targetEmail)) {
+      setMessage({ error: true, text: 'Please enter a valid email address.' });
+      return;
+    }
+
+    if (!canAssignRole(access?.role, role)) {
+      setMessage({ error: true, text: 'You do not have permission to assign this role level.' });
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -76,8 +97,9 @@ export default function UserManagement() {
           businessId: access?.businessId || 'elyx-main-business',
           role,
           status: 'pending',
-          createdBy: user?.uid || 'admin',
+          createdBy: user?.email || user?.uid || 'admin',
           createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
         },
         { merge: true }
       );
@@ -85,7 +107,7 @@ export default function UserManagement() {
       setEmail('');
       setMessage({
         error: false,
-        text: `Invitation saved for ${targetEmail} with role: ${role.toUpperCase()}.`,
+        text: `Invitation successfully saved for ${targetEmail} with role: ${role.toUpperCase()}.`,
       });
     } catch (error) {
       console.error('[Invitation Error]', error);
@@ -109,6 +131,7 @@ export default function UserManagement() {
           status: 'accepted',
           createdBy: user?.uid || 'admin',
           createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
         },
         { merge: true }
       );
@@ -123,19 +146,38 @@ export default function UserManagement() {
   };
 
   // Change Role of existing user or invitation
-  const handleRoleChange = async (targetEmail, targetUserId, newRole) => {
+  const handleRoleChange = async (targetEmail, targetUserId, newRole, docId) => {
+    if (!canAssignRole(access?.role, newRole)) {
+      setMessage({ error: true, text: 'Only an Owner can grant or modify the Owner role.' });
+      return;
+    }
+
+    const normalizedEmail = normalizeEmail(targetEmail);
     try {
-      const invitationRef = doc(db, 'invitations', targetEmail);
-      await updateDoc(invitationRef, { role: newRole }).catch(() => {});
+      if (docId) {
+        await updateDoc(doc(db, 'invitations', docId), {
+          role: newRole,
+          updatedAt: serverTimestamp(),
+        }).catch(() => {});
+      }
+      if (normalizedEmail) {
+        await updateDoc(doc(db, 'invitations', normalizedEmail), {
+          role: newRole,
+          updatedAt: serverTimestamp(),
+        }).catch(() => {});
+      }
 
       if (targetUserId) {
         const userAccessRef = doc(db, 'userAccess', targetUserId);
-        await updateDoc(userAccessRef, { role: newRole }).catch(() => {});
+        await updateDoc(userAccessRef, {
+          role: newRole,
+          updatedAt: serverTimestamp(),
+        }).catch(() => {});
       }
 
       setMessage({
         error: false,
-        text: `Role for ${targetEmail} updated to ${newRole.toUpperCase()}.`,
+        text: `Role for ${normalizedEmail || targetUserId} updated to ${newRole.toUpperCase()}.`,
       });
     } catch (error) {
       console.error('Error changing role:', error);
@@ -143,21 +185,166 @@ export default function UserManagement() {
     }
   };
 
-  // Delete user invitation
-  const handleDeleteUser = async (targetEmail, targetUserId) => {
-    if (!window.confirm(`Are you sure you want to remove access for ${targetEmail}?`)) return;
-
+  // Approve Pending Invitation
+  const handleApproveInvitation = async (invitation) => {
+    const normalizedEmail = normalizeEmail(invitation.email || invitation.id);
+    setMessage(null);
     try {
-      await deleteDoc(doc(db, 'invitations', targetEmail)).catch(() => {});
+      const inviteDocRef = doc(db, 'invitations', invitation.id || normalizedEmail);
+      await updateDoc(inviteDocRef, {
+        status: 'approved',
+        approvedBy: user?.email || user?.uid || 'admin',
+        approvedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      // Also ensure normalized doc ID exists if different
+      if (inviteDocRef.id !== normalizedEmail) {
+        await setDoc(
+          doc(db, 'invitations', normalizedEmail),
+          {
+            ...invitation,
+            email: normalizedEmail,
+            status: 'approved',
+            approvedBy: user?.email || user?.uid || 'admin',
+            approvedAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
+      }
+
+      setMessage({
+        error: false,
+        text: `Invitation approved for ${normalizedEmail}. Role ${invitation.role?.toUpperCase()} is ready to activate upon sign in.`,
+      });
+    } catch (err) {
+      console.error('Error approving invitation:', err);
+      setMessage({ error: true, text: 'Could not approve invitation: ' + err.message });
+    }
+  };
+
+  // Resend / Refresh Invitation
+  const handleResendInvitation = async (invitation) => {
+    const normalizedEmail = normalizeEmail(invitation.email || invitation.id);
+    setMessage(null);
+    try {
+      const targetDocRef = doc(db, 'invitations', normalizedEmail);
+      await setDoc(
+        targetDocRef,
+        {
+          email: normalizedEmail,
+          businessId: invitation.businessId || access?.businessId || 'elyx-main-business',
+          role: invitation.role || 'member',
+          status: 'pending',
+          createdBy: user?.email || user?.uid || 'admin',
+          createdAt: invitation.createdAt || serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      setMessage({
+        error: false,
+        text: `Invitation refreshed and resent for ${normalizedEmail}.`,
+      });
+    } catch (err) {
+      console.error('Error resending invitation:', err);
+      setMessage({ error: true, text: 'Could not refresh invitation: ' + err.message });
+    }
+  };
+
+  // Delete user access or cancel invitation
+  const handleDeleteUser = async (targetEmail, targetUserId, invitationDocId) => {
+    const displayTarget = targetEmail || targetUserId;
+    if (!window.confirm(`Are you sure you want to remove access for ${displayTarget}?`)) return;
+
+    const normalizedEmail = normalizeEmail(targetEmail);
+    try {
+      if (invitationDocId) {
+        await deleteDoc(doc(db, 'invitations', invitationDocId)).catch(() => {});
+      }
+      if (normalizedEmail) {
+        await deleteDoc(doc(db, 'invitations', normalizedEmail)).catch(() => {});
+      }
       if (targetUserId) {
         await deleteDoc(doc(db, 'userAccess', targetUserId)).catch(() => {});
       }
-      setMessage({ error: false, text: `Removed access for ${targetEmail}.` });
+      setMessage({ error: false, text: `Removed access for ${displayTarget}.` });
     } catch (err) {
       console.error('Failed to delete user access:', err);
       setMessage({ error: true, text: 'Failed to remove user access.' });
     }
   };
+
+  // Direct Manual Activation by UID
+  const handleDirectActivate = async (e) => {
+    e.preventDefault();
+    const cleanEmail = normalizeEmail(directEmail);
+    const cleanUid = directUid.trim();
+
+    if (!cleanEmail || !cleanUid) {
+      setMessage({ error: true, text: 'Both Email and Firebase Auth UID are required.' });
+      return;
+    }
+
+    if (!canAssignRole(access?.role, directRole)) {
+      setMessage({ error: true, text: 'You do not have permission to assign this role.' });
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      // 1. Create or update userAccess doc
+      await setDoc(
+        doc(db, 'userAccess', cleanUid),
+        {
+          businessId: access?.businessId || 'elyx-main-business',
+          role: directRole,
+          email: cleanEmail,
+          displayName: cleanEmail.split('@')[0],
+          invitedBy: user?.email || 'admin',
+          status: 'active',
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      // 2. Mark invitation accepted
+      await setDoc(
+        doc(db, 'invitations', cleanEmail),
+        {
+          email: cleanEmail,
+          businessId: access?.businessId || 'elyx-main-business',
+          role: directRole,
+          status: 'accepted',
+          acceptedBy: cleanUid,
+          acceptedAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      setMessage({
+        error: false,
+        text: `Successfully activated ${cleanEmail} (UID: ${cleanUid}) as ${directRole.toUpperCase()}.`,
+      });
+      setShowDirectModal(false);
+      setDirectEmail('');
+      setDirectUid('');
+    } catch (err) {
+      console.error('Direct activation error:', err);
+      setMessage({ error: true, text: 'Direct activation failed: ' + err.message });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Active users set for deduplication
+  const activeUserEmails = new Set(
+    activeUsers.map((u) => normalizeEmail(u.email)).filter(Boolean)
+  );
 
   // Filter users by search
   const filteredUsers = activeUsers.filter(
@@ -167,13 +354,18 @@ export default function UserManagement() {
       u.role?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const filteredInvitations = invitations.filter(
-    (inv) =>
-      inv.status !== 'accepted' &&
-      (!searchQuery ||
-        inv.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        inv.role?.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  // Filter pending invitations: exclude users who are already active or accepted
+  const filteredInvitations = invitations.filter((inv) => {
+    const invEmail = normalizeEmail(inv.email || inv.id);
+    if (!invEmail || activeUserEmails.has(invEmail) || inv.status === 'accepted') {
+      return false;
+    }
+    return (
+      !searchQuery ||
+      invEmail.includes(searchQuery.toLowerCase()) ||
+      inv.role?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  });
 
   return (
     <div className={styles.panel} aria-labelledby="user-management-title">
@@ -184,7 +376,7 @@ export default function UserManagement() {
           </p>
           <h2 id="user-management-title">Users & Access Management</h2>
           <p>
-            Manage team members, assign <strong>Manager</strong> or <strong>Owner</strong> privileges, and authorize Google email accounts.
+            Manage team members, approve pending invitations, and assign <strong>Manager</strong> or <strong>Owner</strong> privileges.
           </p>
         </div>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -205,11 +397,119 @@ export default function UserManagement() {
           >
             👑 Grant DeveloperHar Owner Role
           </button>
+
+          <button
+            type="button"
+            onClick={() => setShowDirectModal(!showDirectModal)}
+            style={{
+              padding: '8px 14px',
+              fontSize: '0.85rem',
+              background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.25) 0%, rgba(14, 165, 233, 0.35) 100%)',
+              border: '1px solid #38bdf8',
+              color: '#ffffff',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontWeight: '600',
+            }}
+          >
+            ⚡ Direct UID Activation
+          </button>
+
           <span className={styles.count}>
             {activeUsers.length + filteredInvitations.length} total user(s)
           </span>
         </div>
       </div>
+
+      {/* Direct UID Activation Box */}
+      {showDirectModal && (
+        <form
+          onSubmit={handleDirectActivate}
+          style={{
+            marginTop: '16px',
+            padding: '16px',
+            background: 'rgba(15, 23, 42, 0.9)',
+            border: '1px solid rgba(56, 189, 248, 0.4)',
+            borderRadius: '10px',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr)) auto',
+            gap: '12px',
+            alignItems: 'end',
+          }}
+        >
+          <label style={{ display: 'grid', gap: '4px', fontSize: '0.82rem', color: '#cbd5e1' }}>
+            User Email
+            <input
+              type="email"
+              value={directEmail}
+              onChange={(e) => setDirectEmail(e.target.value)}
+              placeholder="elyx@gmail.com"
+              required
+              style={{
+                padding: '8px 12px',
+                background: '#020617',
+                border: '1px solid #334155',
+                color: '#ffffff',
+                borderRadius: '6px',
+              }}
+            />
+          </label>
+
+          <label style={{ display: 'grid', gap: '4px', fontSize: '0.82rem', color: '#cbd5e1' }}>
+            Firebase Auth UID
+            <input
+              type="text"
+              value={directUid}
+              onChange={(e) => setDirectUid(e.target.value)}
+              placeholder="e.g. Firebase Auth User UID"
+              required
+              style={{
+                padding: '8px 12px',
+                background: '#020617',
+                border: '1px solid #334155',
+                color: '#ffffff',
+                borderRadius: '6px',
+              }}
+            />
+          </label>
+
+          <label style={{ display: 'grid', gap: '4px', fontSize: '0.82rem', color: '#cbd5e1' }}>
+            Role Level
+            <select
+              value={directRole}
+              onChange={(e) => setDirectRole(e.target.value)}
+              style={{
+                padding: '8px 12px',
+                background: '#020617',
+                border: '1px solid #334155',
+                color: '#ffffff',
+                borderRadius: '6px',
+              }}
+            >
+              <option value="manager">⭐ Manager</option>
+              <option value="member">🛠️ Member</option>
+              <option value="viewer">👁️ Viewer</option>
+              {isOwner && <option value="owner">👑 Owner</option>}
+            </select>
+          </label>
+
+          <button
+            type="submit"
+            disabled={submitting}
+            style={{
+              padding: '9px 16px',
+              background: '#0284c7',
+              color: '#ffffff',
+              border: 0,
+              borderRadius: '6px',
+              fontWeight: '700',
+              cursor: 'pointer',
+            }}
+          >
+            {submitting ? 'Activating…' : '⚡ Activate User Now'}
+          </button>
+        </form>
+      )}
 
       {/* Add User Form */}
       <form className={styles.form} onSubmit={inviteUser}>
@@ -219,7 +519,7 @@ export default function UserManagement() {
             type="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
-            placeholder="e.g. developerhar@gmail.com"
+            placeholder="e.g. elyx@gmail.com"
             required
           />
         </label>
@@ -282,16 +582,17 @@ export default function UserManagement() {
                     {activeUser.email}
                   </span>
                   <span style={{ fontSize: '0.78rem', color: '#9ca3af', marginTop: '2px' }}>
-                    {activeUser.displayName || 'Authorized User'}
+                    {activeUser.displayName || 'Authorized User'} • UID: {activeUser.id}
                   </span>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div className={styles.actionControls}>
                   <select
                     value={activeUser.role || 'member'}
                     onChange={(e) =>
-                      handleRoleChange(activeUser.email, activeUser.id, e.target.value)
+                      handleRoleChange(activeUser.email, activeUser.id, e.target.value, null)
                     }
+                    disabled={activeUser.role === 'owner' && !isOwner}
                     style={{
                       background: '#1a1a2e',
                       color: '#a78bfa',
@@ -302,7 +603,7 @@ export default function UserManagement() {
                       fontWeight: '600',
                     }}
                   >
-                    <option value="owner">👑 Owner</option>
+                    <option value="owner" disabled={!isOwner}>👑 Owner</option>
                     <option value="manager">⭐ Manager</option>
                     <option value="member">🛠️ Member</option>
                     <option value="viewer">👁️ Viewer</option>
@@ -312,12 +613,12 @@ export default function UserManagement() {
 
                   <button
                     type="button"
-                    onClick={() => handleDeleteUser(activeUser.email, activeUser.id)}
+                    onClick={() => handleDeleteUser(activeUser.email, activeUser.id, null)}
                     style={{
                       background: 'rgba(239, 68, 68, 0.15)',
                       border: '1px solid rgba(239, 68, 68, 0.3)',
                       color: '#ef4444',
-                      padding: '4px 8px',
+                      padding: '5px 9px',
                       borderRadius: '6px',
                       cursor: 'pointer',
                       fontSize: '0.8rem',
@@ -343,13 +644,20 @@ export default function UserManagement() {
           <div className={styles.list}>
             {filteredInvitations.map((invitation) => (
               <div className={styles.invitation} key={invitation.id}>
-                <span>{invitation.email}</span>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontWeight: '700', color: '#ffffff', fontSize: '0.95rem' }}>
+                    {invitation.email || invitation.id}
+                  </span>
+                  <span style={{ fontSize: '0.78rem', color: '#9ca3af', marginTop: '2px' }}>
+                    Invited by: {invitation.createdBy || 'manager'} • Status: {invitation.status || 'pending'}
+                  </span>
+                </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div className={styles.actionControls}>
                   <select
                     value={invitation.role || 'member'}
                     onChange={(e) =>
-                      handleRoleChange(invitation.email, null, e.target.value)
+                      handleRoleChange(invitation.email, null, e.target.value, invitation.id)
                     }
                     style={{
                       background: '#1a1a2e',
@@ -360,22 +668,44 @@ export default function UserManagement() {
                       fontSize: '0.85rem',
                     }}
                   >
-                    <option value="owner">👑 Owner</option>
+                    <option value="owner" disabled={!isOwner}>👑 Owner</option>
                     <option value="manager">⭐ Manager</option>
                     <option value="member">🛠️ Member</option>
                     <option value="viewer">👁️ Viewer</option>
                   </select>
 
-                  <span className={styles.pending}>Pending</span>
+                  <span className={invitation.status === 'approved' ? styles.approved : styles.pending}>
+                    {invitation.status === 'approved' ? '✓ Approved' : '⏳ Pending'}
+                  </span>
 
                   <button
                     type="button"
-                    onClick={() => handleDeleteUser(invitation.email, null)}
+                    className={styles.approveBtn}
+                    onClick={() => handleApproveInvitation(invitation)}
+                    title="Approve invitation for immediate activation"
+                  >
+                    ✓ Approve
+                  </button>
+
+                  <button
+                    type="button"
+                    className={styles.resendBtn}
+                    onClick={() => handleResendInvitation(invitation)}
+                    title="Refresh and resend invitation"
+                  >
+                    🔄 Resend
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleDeleteUser(invitation.email, null, invitation.id)
+                    }
                     style={{
                       background: 'rgba(239, 68, 68, 0.15)',
                       border: '1px solid rgba(239, 68, 68, 0.3)',
                       color: '#ef4444',
-                      padding: '4px 8px',
+                      padding: '5px 9px',
                       borderRadius: '6px',
                       cursor: 'pointer',
                       fontSize: '0.8rem',
