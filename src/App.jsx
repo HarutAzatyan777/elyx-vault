@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './hooks/useAuth.jsx';
 import { ThemeProvider } from './context/ThemeContext';
 import { MusicProvider } from './context/MusicContext';
+import { OSProvider, WindowManagerProvider } from './os/index.js';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 
@@ -42,6 +43,15 @@ function AppRoutes() {
       />
 
       <Route
+        path="/os"
+        element={
+          authorized
+            ? <Dashboard />
+            : <Navigate to="/login" replace />
+        }
+      />
+
+      <Route
         path="*"
         element={
           <Navigate
@@ -59,9 +69,13 @@ export default function App() {
     <ThemeProvider>
       <AuthProvider>
         <MusicProvider>
-          <BrowserRouter>
-            <AppRoutes />
-          </BrowserRouter>
+          <OSProvider>
+            <WindowManagerProvider>
+              <BrowserRouter>
+                <AppRoutes />
+              </BrowserRouter>
+            </WindowManagerProvider>
+          </OSProvider>
         </MusicProvider>
       </AuthProvider>
     </ThemeProvider>

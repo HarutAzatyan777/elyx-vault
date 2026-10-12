@@ -1,0 +1,146 @@
+/**
+ * Elyx OS 1.0 — Base Styles & Reusable Glass Utilities
+ */
+
+/* Glassmorphism Surface Utility Classes */
+.elyx-glass-surface {
+  background: var(--elyx-surface-panel);
+  backdrop-filter: var(--elyx-glass-blur-md);
+  -webkit-backdrop-filter: var(--elyx-glass-blur-md);
+  border: 1px solid var(--elyx-glass-border);
+  box-shadow: var(--elyx-glass-specular), var(--elyx-shadow-level-2);
+}
+
+.elyx-glass-dock {
+  background: var(--elyx-surface-dock);
+  backdrop-filter: var(--elyx-glass-blur-dock);
+  -webkit-backdrop-filter: var(--elyx-glass-blur-dock);
+  border: 1px solid var(--elyx-glass-border);
+  border-radius: var(--elyx-radius-dock);
+  box-shadow: var(--elyx-glass-specular), var(--elyx-shadow-dock);
+}
+
+.elyx-glass-window {
+  background: var(--elyx-surface-window-active);
+  backdrop-filter: var(--elyx-glass-blur-lg);
+  -webkit-backdrop-filter: var(--elyx-glass-blur-lg);
+  border: 1px solid var(--elyx-glass-border);
+  border-radius: var(--elyx-radius-window);
+  box-shadow: var(--elyx-glass-specular-active), var(--elyx-shadow-window-active);
+  transition: box-shadow var(--elyx-duration-fast) var(--elyx-ease-standard),
+              border-color var(--elyx-duration-fast) var(--elyx-ease-standard);
+}
+
+.elyx-glass-window.is-inactive {
+  background: var(--elyx-surface-window-inactive);
+  box-shadow: var(--elyx-glass-specular), var(--elyx-shadow-window-inactive);
+  border-color: var(--elyx-glass-border-subtle);
+}
+
+.elyx-glass-modal {
+  background: var(--elyx-surface-modal);
+  backdrop-filter: var(--elyx-glass-blur-lg);
+  -webkit-backdrop-filter: var(--elyx-glass-blur-lg);
+  border: 1px solid var(--elyx-glass-border);
+  border-radius: var(--elyx-radius-xl);
+  box-shadow: var(--elyx-glass-specular-active), var(--elyx-shadow-modal);
+}
+
+.elyx-squircle {
+  border-radius: var(--elyx-radius-xl);
+  overflow: hidden;
+}
+
+/* macOS-inspired Traffic Lights */
+.elyx-traffic-lights {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 4px;
+}
+
+.elyx-traffic-btn {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: filter var(--elyx-duration-fast), transform var(--elyx-duration-fast);
+}
+
+.elyx-traffic-btn:hover {
+  transform: scale(1.08);
+}
+
+.elyx-traffic-close {
+  background-color: var(--elyx-traffic-close);
+}
+.elyx-traffic-close:hover {
+  background-color: var(--elyx-traffic-close-hover);
+}
+
+.elyx-traffic-minimize {
+  background-color: var(--elyx-traffic-minimize);
+}
+.elyx-traffic-minimize:hover {
+  background-color: var(--elyx-traffic-minimize-hover);
+}
+
+.elyx-traffic-maximize {
+  background-color: var(--elyx-traffic-maximize);
+}
+.elyx-traffic-maximize:hover {
+  background-color: var(--elyx-traffic-maximize-hover);
+}
+
+/* Windows 11-style Snap Layout Grid Helper */
+.elyx-snap-preview {
+  position: absolute;
+  pointer-events: none;
+  border-radius: var(--elyx-radius-window);
+  background: rgba(99, 102, 241, 0.15);
+  border: 2px solid var(--elyx-brand-primary);
+  box-shadow: var(--elyx-shadow-snap-preview);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: var(--elyx-z-snap-indicator);
+  transition: all var(--elyx-duration-fast) var(--elyx-ease-spring-snappy);
+}
+
+/* GNOME Workspace Indicators */
+.elyx-workspace-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: rgba(15, 23, 42, 0.6);
+  border-radius: var(--elyx-radius-pill);
+  border: 1px solid var(--elyx-glass-border);
+}
+
+.elyx-workspace-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--elyx-workspace-pill-inactive);
+  transition: all var(--elyx-duration-normal) var(--elyx-ease-spring-gentle);
+}
+
+.elyx-workspace-dot.is-active {
+  width: 22px;
+  border-radius: 4px;
+  background: var(--elyx-workspace-pill-active);
+  box-shadow: 0 0 10px var(--elyx-brand-glow);
+}
+
+/* Touch friendly minimums for mobile OS mode */
+@media (max-width: 768px) {
+  .elyx-interactive-target {
+    min-height: var(--elyx-touch-target-min);
+    min-width: var(--elyx-touch-target-min);
+  }
+}

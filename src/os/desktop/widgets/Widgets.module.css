@@ -1,0 +1,388 @@
+.widgetCard {
+  background: var(--elyx-surface-card, rgba(15, 23, 42, 0.75));
+  backdrop-filter: var(--elyx-glass-blur-md, blur(20px));
+  -webkit-backdrop-filter: var(--elyx-glass-blur-md, blur(20px));
+  border: 1px solid var(--elyx-glass-border, rgba(255, 255, 255, 0.08));
+  box-shadow: var(--elyx-glass-specular), var(--elyx-shadow-level-2);
+  border-radius: var(--elyx-radius-lg, 14px);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  transition: transform var(--elyx-duration-fast) var(--elyx-ease-standard),
+              box-shadow var(--elyx-duration-fast) var(--elyx-ease-standard);
+  user-select: none;
+}
+
+.widgetCard:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--elyx-glass-specular-active), var(--elyx-shadow-level-3);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.widgetHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--elyx-glass-border-subtle, rgba(255, 255, 255, 0.05));
+  padding-bottom: 0.5rem;
+}
+
+.widgetHeaderTitle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--elyx-text-muted, #94a3b8);
+}
+
+.widgetIcon {
+  font-size: 0.95rem;
+}
+
+.widgetHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.widgetCloseBtn {
+  background: transparent;
+  border: none;
+  color: var(--elyx-text-dim, #64748b);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 0.25rem;
+  border-radius: var(--elyx-radius-xs, 4px);
+  transition: all var(--elyx-duration-fast);
+}
+
+.widgetCloseBtn:hover {
+  color: var(--elyx-text-primary, #ffffff);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Clock Display */
+.clockBody {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.greetingText {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--elyx-text-muted, #94a3b8);
+}
+
+.clockDisplay {
+  display: flex;
+  align-items: baseline;
+  gap: 0.15rem;
+}
+
+.clockTime {
+  font-size: 1.85rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  color: var(--elyx-text-primary, #ffffff);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.clockSeconds {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--elyx-brand-secondary, #06b6d4);
+  font-variant-numeric: tabular-nums;
+}
+
+.dateDisplay {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.dayBadge {
+  background: rgba(99, 102, 241, 0.18);
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  color: #a5b4fc;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.15rem 0.45rem;
+  border-radius: var(--elyx-radius-pill, 999px);
+}
+
+.dateText {
+  font-size: 0.75rem;
+  color: var(--elyx-text-secondary, #cbd5e1);
+}
+
+/* Work Session */
+.sessionBody {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.sessionActive {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.sessionStatusBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--elyx-status-online, #10b981);
+}
+
+.pulseDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--elyx-status-online, #10b981);
+  box-shadow: 0 0 8px var(--elyx-status-online-glow);
+  animation: pulse 2s infinite ease-in-out;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+
+.sessionPresetName {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--elyx-text-primary, #ffffff);
+}
+
+.sessionTimer {
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--elyx-brand-secondary, #06b6d4);
+  font-variant-numeric: tabular-nums;
+}
+
+.sessionIdle {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.25rem 0;
+}
+
+.sessionIdleText {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--elyx-text-secondary, #cbd5e1);
+}
+
+.sessionIdleSubtext {
+  font-size: 0.75rem;
+  color: var(--elyx-text-dim, #64748b);
+}
+
+.widgetActionBtn {
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  color: #c7d2fe;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.45rem 0.75rem;
+  border-radius: var(--elyx-radius-md, 10px);
+  cursor: pointer;
+  transition: all var(--elyx-duration-fast);
+  text-align: center;
+}
+
+.widgetActionBtn:hover {
+  background: rgba(99, 102, 241, 0.28);
+  border-color: rgba(99, 102, 241, 0.55);
+  color: #ffffff;
+}
+
+/* Storage & Vault */
+.storageGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.storageMetric {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--elyx-glass-border-subtle);
+  border-radius: var(--elyx-radius-md, 10px);
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  cursor: pointer;
+  transition: all var(--elyx-duration-fast);
+}
+
+.storageMetric:hover {
+  background: rgba(99, 102, 241, 0.15);
+  border-color: rgba(99, 102, 241, 0.35);
+}
+
+.metricNumber {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--elyx-text-primary, #ffffff);
+}
+
+.metricLabel {
+  font-size: 0.68rem;
+  color: var(--elyx-text-muted, #94a3b8);
+  font-weight: 600;
+}
+
+.securityPills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.securityPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--elyx-glass-border-subtle);
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--elyx-radius-pill, 999px);
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--elyx-text-secondary, #cbd5e1);
+}
+
+.statusDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.dotGreen {
+  background: var(--elyx-status-online, #10b981);
+  box-shadow: 0 0 6px var(--elyx-status-online-glow);
+}
+
+.dotAmber {
+  background: var(--elyx-status-warning, #f59e0b);
+  box-shadow: 0 0 6px var(--elyx-status-warning-glow);
+}
+
+.dotDim {
+  background: var(--elyx-text-dim, #64748b);
+}
+
+.statusBadgeText {
+  text-transform: capitalize;
+}
+
+/* Quick Notes */
+.quickNoteTextarea {
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--elyx-glass-border-subtle);
+  border-radius: var(--elyx-radius-sm, 6px);
+  padding: 0.5rem;
+  color: var(--elyx-text-primary, #ffffff);
+  font-family: var(--elyx-font-family);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  resize: vertical;
+  min-height: 70px;
+}
+
+.quickNoteTextarea:focus {
+  outline: none;
+  border-color: var(--elyx-brand-primary, #6366f1);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+}
+
+.quickNoteFooter {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.savedStatusText {
+  font-size: 0.68rem;
+  color: var(--elyx-text-dim, #64748b);
+  font-style: italic;
+}
+
+.openNotepadBtn {
+  background: transparent;
+  border: none;
+  color: var(--elyx-brand-secondary, #06b6d4);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.2rem 0;
+  transition: color var(--elyx-duration-fast);
+}
+
+.openNotepadBtn:hover {
+  color: #38bdf8;
+  text-decoration: underline;
+}
+
+/* Favorite Apps */
+.favGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+
+.favAppPill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.5rem 0.25rem;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--elyx-glass-border-subtle);
+  border-radius: var(--elyx-radius-md, 10px);
+  cursor: pointer;
+  transition: all var(--elyx-duration-fast);
+}
+
+.favAppPill:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
+}
+
+.favAppIcon {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--elyx-radius-sm, 6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+.favAppName {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--elyx-text-secondary, #cbd5e1);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+}

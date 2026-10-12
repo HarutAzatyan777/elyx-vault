@@ -1,0 +1,112 @@
+.stageLayer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: var(--elyx-z-window-base, 100);
+  overflow: hidden;
+}
+
+.stageLayer > * {
+  pointer-events: auto;
+}
+
+/* Locked Container inside Window */
+.lockedContainer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 2rem;
+}
+
+.lockedCard {
+  max-width: 420px;
+  width: 100%;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.lockedIcon {
+  font-size: 2.5rem;
+}
+
+.lockedTitle {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--elyx-text-primary, #ffffff);
+  margin: 0;
+}
+
+.lockedSubtitle {
+  font-size: 0.8125rem;
+  color: var(--elyx-text-muted, #94a3b8);
+  margin: 0;
+}
+
+/* Projects Module inside Window */
+.projectsModule {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.addProjectSection {
+  background: var(--elyx-surface-card, rgba(15, 23, 42, 0.6));
+  border: 1px solid var(--elyx-glass-border-subtle);
+  border-radius: var(--elyx-radius-lg, 12px);
+  padding: 1rem;
+}
+
+.projectsHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.projectsTitle {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--elyx-text-primary, #ffffff);
+}
+
+.projectsCountBadge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.12);
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+}
+
+.projectsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.emptyProjects {
+  padding: 3rem;
+  text-align: center;
+  color: var(--elyx-text-dim, #64748b);
+}
+
+.loadingPlaceholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--elyx-text-muted, #94a3b8);
+  font-size: 0.875rem;
+  padding: 2rem;
+}
+
+.genericPlaceholder {
+  padding: 3rem;
+  text-align: center;
+  color: var(--elyx-text-muted, #94a3b8);
+}

@@ -30,6 +30,8 @@ import RemoteTerminal from '../components/remote/RemoteTerminal';
 import { useRemoteDevices } from '../hooks/useRemoteDevices';
 import { subscribeRTDBConnection } from '../services/rtdbService';
 import Sidebar from '../components/Sidebar';
+import { useOS } from '../os/index.js';
+import DesktopShell from '../os/shell/DesktopShell.jsx';
 
 import styles from './Dashboard.module.css';
 
@@ -71,6 +73,7 @@ const getInitialTab = () => {
 
 export const Dashboard = () => {
   const { user, access, logout } = useAuth();
+  const { isOSMode, toggleOSMode } = useOS();
   const {
     devices,
     securityEvents,
@@ -246,6 +249,30 @@ export const Dashboard = () => {
       }
     } catch {}
   };
+
+  if (isOSMode) {
+    return (
+      <DesktopShell
+        user={user}
+        access={access}
+        projects={projects}
+        onDeleteProject={handleDelete}
+        devices={devices}
+        securityEvents={securityEvents}
+        selectedDevice={selectedDevice}
+        selectedDeviceId={selectedDeviceId}
+        setSelectedDeviceId={setSelectedDeviceId}
+        handleRegisterDevice={handleRegisterDevice}
+        handleRenameDevice={handleRenameDevice}
+        handleRevokeDevice={handleRevokeDevice}
+        masterPassword={masterPassword}
+        handleUnlockVault={handleUnlockVault}
+        handleLockVault={handleLockVault}
+        logout={logout}
+        isRTDBConnected={isRTDBConnected}
+      />
+    );
+  }
 
   return (
     <div className={styles.layout}>
@@ -431,6 +458,22 @@ export const Dashboard = () => {
               <span className={`${styles.rtdbDot} ${isRTDBConnected ? styles.rtdbOnline : ''}`} />
               <span>{isRTDBConnected ? 'RTDB Live' : 'RTDB Connecting'}</span>
             </div>
+
+            {/* Elyx OS Mode Feature Flag Toggle */}
+            <button
+              type="button"
+              onClick={toggleOSMode}
+              className={`${styles.osModeBadge} ${isOSMode ? styles.osModeActive : ''}`}
+              title={
+                isOSMode
+                  ? 'Elyx OS 1.0 Mode: Active — Click to switch to Classic Dashboard'
+                  : 'Classic Dashboard Mode — Click to switch to Elyx OS 1.0 Mode'
+              }
+              aria-label="Toggle Elyx OS Mode"
+            >
+              <span className={styles.osModeDot} />
+              <span>{isOSMode ? 'Elyx OS 1.0' : 'OS: Classic'}</span>
+            </button>
 
             {access?.role && (
               <span className={styles.roleBadge}>

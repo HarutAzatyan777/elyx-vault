@@ -1,0 +1,144 @@
+.contextMenu {
+  position: fixed;
+  z-index: var(--elyx-z-context-menu, 1500);
+  width: 220px;
+  background: var(--elyx-surface-popover, rgba(13, 21, 44, 0.95));
+  backdrop-filter: var(--elyx-glass-blur-md, blur(24px));
+  -webkit-backdrop-filter: var(--elyx-glass-blur-md, blur(24px));
+  border: 1px solid var(--elyx-glass-border, rgba(255, 255, 255, 0.12));
+  border-radius: var(--elyx-radius-lg, 14px);
+  box-shadow: var(--elyx-glass-specular-active), var(--elyx-shadow-level-4);
+  padding: 0.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  user-select: none;
+  animation: fadeIn 0.15s cubic-bezier(0.19, 1, 0.22, 1);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.45rem 0.6rem;
+  background: transparent;
+  border: none;
+  border-radius: var(--elyx-radius-md, 8px);
+  color: var(--elyx-text-primary, #ffffff);
+  font-family: var(--elyx-font-family);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: all var(--elyx-duration-instant);
+}
+
+.menuItem:hover {
+  background: var(--elyx-brand-primary, #6366f1);
+  color: #ffffff;
+}
+
+.itemIcon {
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+}
+
+.itemText {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.submenuChevron {
+  font-size: 0.875rem;
+  color: var(--elyx-text-dim, #94a3b8);
+}
+
+.menuItem:hover .submenuChevron {
+  color: #ffffff;
+}
+
+.menuDivider {
+  height: 1px;
+  background: var(--elyx-glass-border-subtle, rgba(255, 255, 255, 0.08));
+  margin: 0.25rem 0.4rem;
+}
+
+/* Submenu */
+.menuItemHasSubmenu {
+  position: relative;
+  width: 100%;
+}
+
+.submenu {
+  position: absolute;
+  top: -4px;
+  left: calc(100% + 4px);
+  width: 200px;
+  background: var(--elyx-surface-popover, rgba(13, 21, 44, 0.96));
+  backdrop-filter: var(--elyx-glass-blur-md, blur(24px));
+  -webkit-backdrop-filter: var(--elyx-glass-blur-md, blur(24px));
+  border: 1px solid var(--elyx-glass-border, rgba(255, 255, 255, 0.12));
+  border-radius: var(--elyx-radius-lg, 14px);
+  box-shadow: var(--elyx-glass-specular-active), var(--elyx-shadow-level-4);
+  padding: 0.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  z-index: 10;
+  animation: fadeIn 0.15s cubic-bezier(0.19, 1, 0.22, 1);
+}
+
+.submenuItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.45rem 0.6rem;
+  background: transparent;
+  border: none;
+  border-radius: var(--elyx-radius-md, 8px);
+  color: var(--elyx-text-primary, #ffffff);
+  font-family: var(--elyx-font-family);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--elyx-duration-instant);
+}
+
+.submenuItem:hover {
+  background: var(--elyx-brand-primary, #6366f1);
+  color: #ffffff;
+}
+
+.colorDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.5);
+  margin-right: 0.4rem;
+}
+
+.checkMark {
+  font-size: 0.8125rem;
+  color: var(--elyx-brand-secondary, #06b6d4);
+  font-weight: 700;
+}
+
+.submenuItem:hover .checkMark {
+  color: #ffffff;
+}
+
+.activeItem {
+  font-weight: 700;
+}

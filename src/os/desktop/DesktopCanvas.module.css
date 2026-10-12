@@ -1,0 +1,60 @@
+.canvas {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  user-select: none;
+  outline: none;
+  transition: background 0.4s var(--elyx-ease-standard);
+  display: flex;
+}
+
+.canvasVignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 50%, transparent 60%, rgba(0, 0, 0, 0.45) 100%);
+  z-index: var(--elyx-z-wallpaper, 0);
+}
+
+.gridArea {
+  position: absolute;
+  top: calc(var(--elyx-topbar-height, 38px) + 1.25rem);
+  left: 1.5rem;
+  bottom: 1.5rem;
+  right: 320px; /* leaves room for widgets on right */
+  pointer-events: auto;
+  z-index: var(--elyx-z-desktop-icons, 10);
+  overflow: hidden;
+}
+
+.iconsGrid {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 0.85rem 1rem;
+  height: 100%;
+  max-height: 100%;
+}
+
+@media (max-width: 1024px) {
+  .gridArea {
+    right: 260px;
+    left: 1rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .gridArea {
+    right: 1rem;
+    left: 1rem;
+  }
+
+  .iconsGrid {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    height: auto;
+  }
+}

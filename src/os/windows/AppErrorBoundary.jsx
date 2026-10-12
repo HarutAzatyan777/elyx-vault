@@ -1,0 +1,81 @@
+import React, { Component } from 'react';
+
+/**
+ * Per-Window Error Boundary to insulate the desktop shell and other running windows
+ * from unexpected runtime errors within individual applications.
+ */
+export class AppErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error(`[AppErrorBoundary] Error in app "${this.props.appTitle || 'App'}":`, error, errorInfo);
+  }
+
+  handleReset = () => {
+    this.setState({ hasError: false, error: null });
+  };
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div
+          style={{
+            padding: '32px 24px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '100%',
+            textAlign: 'center',
+            color: '#ffffff',
+            background: 'rgba(15, 23, 42, 0.95)',
+          }}
+          role="alert"
+        >
+          <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>⚠️</div>
+          <h3 style={{ margin: '0 0 8px 0', fontSize: '1.125rem', fontWeight: 700 }}>
+            {this.props.appTitle || 'Application'} Encountered an Error
+          </h3>
+          <p
+            style={{
+              margin: '0 0 16px 0',
+              fontSize: '0.8125rem',
+              color: '#94a3b8',
+              maxWidth: '400px',
+              lineHeight: 1.4,
+            }}
+          >
+            {this.state.error?.message || 'An unexpected error occurred while executing this module.'}
+          </p>
+          <button
+            type="button"
+            onClick={this.handleReset}
+            style={{
+              background: '#6366f1',
+              border: 'none',
+              borderRadius: '8px',
+              padding: '8px 16px',
+              color: '#ffffff',
+              fontSize: '0.8125rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Reload Component
+          </button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+export default AppErrorBoundary;

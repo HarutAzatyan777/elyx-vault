@@ -1,5 +1,6 @@
 import React from 'react';
 import { useTheme } from '../context/ThemeContext';
+import { useOS } from '../os/index.js';
 import styles from './Sidebar.module.css';
 
 export const Sidebar = ({
@@ -18,6 +19,7 @@ export const Sidebar = ({
   onToggleCollapse,
 }) => {
   const { theme, toggleTheme } = useTheme();
+  const { isOSMode, toggleOSMode } = useOS();
 
   return (
     <>
@@ -281,6 +283,26 @@ export const Sidebar = ({
 
         {/* Footer Area */}
         <div className={styles.footer}>
+          {/* Elyx OS Mode Switcher */}
+          <button
+            onClick={toggleOSMode}
+            className={styles.themeToggleBtn}
+            title={isOSMode ? 'Switch to Classic Dashboard' : 'Switch to Elyx OS 1.0 Mode'}
+            aria-label="Toggle Elyx OS Mode"
+          >
+            <div className={styles.themeInfo}>
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="18" height="18" style={{ color: isOSMode ? '#06b6d4' : '#818cf8' }}>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              {!isCollapsed && <span>{isOSMode ? 'Elyx OS 1.0' : 'Classic Mode'}</span>}
+            </div>
+            {!isCollapsed && (
+              <span className={styles.themeBadge} style={isOSMode ? { background: 'rgba(6, 182, 212, 0.15)', color: '#06b6d4' } : undefined}>
+                {isOSMode ? 'OS Active' : 'Classic'}
+              </span>
+            )}
+          </button>
+
           {/* Global Light / Dark Theme Switcher */}
           <button
             onClick={toggleTheme}

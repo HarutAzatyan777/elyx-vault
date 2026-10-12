@@ -1,0 +1,262 @@
+/* ==========================================================================
+   Elyx OS 1.0 — Command Palette (Spotlight) Styles
+   ========================================================================== */
+
+.paletteBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: var(--elyx-surface-overlay, rgba(5, 10, 20, 0.65));
+  backdrop-filter: var(--elyx-glass-blur-lg, blur(24px));
+  -webkit-backdrop-filter: var(--elyx-glass-blur-lg, blur(24px));
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 14vh;
+  animation: paletteFadeIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes paletteFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.paletteContainer {
+  width: min(640px, 94vw);
+  background: var(--elyx-surface-glass-heavy, rgba(15, 23, 42, 0.94));
+  backdrop-filter: var(--elyx-glass-blur-lg, blur(36px));
+  -webkit-backdrop-filter: var(--elyx-glass-blur-lg, blur(36px));
+  border-radius: 20px;
+  border: 1px solid var(--elyx-glass-border, rgba(255, 255, 255, 0.15));
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.75),
+              0 8px 20px rgba(0, 0, 0, 0.35),
+              inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* --------------------------------------------------------------------------
+   SEARCH BAR
+   -------------------------------------------------------------------------- */
+.searchBar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--elyx-glass-border-subtle, rgba(255, 255, 255, 0.08));
+}
+
+.searchIcon {
+  color: var(--elyx-accent-primary, #818cf8);
+  flex-shrink: 0;
+}
+
+.searchInput {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--elyx-text-primary, #ffffff);
+  font-size: 1.125rem;
+  font-weight: 500;
+  outline: none;
+}
+
+.searchInput::placeholder {
+  color: var(--elyx-text-muted, #94a3b8);
+  font-size: 1rem;
+}
+
+.kbdBadge {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--elyx-text-muted, #94a3b8);
+}
+
+/* --------------------------------------------------------------------------
+   RESULTS LIST
+   -------------------------------------------------------------------------- */
+.resultsList {
+  max-height: 380px;
+  overflow-y: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.resultRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+  user-select: none;
+}
+
+.resultRow:hover,
+.rowSelected {
+  background-color: var(--elyx-accent-primary, #6366f1);
+}
+
+.rowIcon {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.appIconPill {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+
+.cmdIconText {
+  font-size: 1.125rem;
+}
+
+.rowText {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.rowTitleArea {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rowTitle {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--elyx-text-primary, #ffffff);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lockBadge {
+  font-size: 0.6875rem;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 1px 6px;
+  border-radius: 4px;
+  color: var(--elyx-text-muted, #94a3b8);
+}
+
+.rowSelected .lockBadge {
+  color: #ffffff;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.rowDesc {
+  font-size: 0.75rem;
+  color: var(--elyx-text-muted, #94a3b8);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rowSelected .rowDesc {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.rowMeta {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.shortcutKbd {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 0.6875rem;
+  color: #ffffff;
+}
+
+.domainTag {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--elyx-text-muted, #94a3b8);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.rowSelected .domainTag {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.noResults {
+  padding: 32px 20px;
+  text-align: center;
+  color: var(--elyx-text-muted, #94a3b8);
+  font-size: 0.875rem;
+}
+
+/* --------------------------------------------------------------------------
+   FOOTER
+   -------------------------------------------------------------------------- */
+.paletteFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: rgba(15, 23, 42, 0.6);
+  border-top: 1px solid var(--elyx-glass-border-subtle, rgba(255, 255, 255, 0.08));
+  font-size: 0.6875rem;
+  color: var(--elyx-text-muted, #94a3b8);
+}
+
+.footerHints {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.hintKbd {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 1px 4px;
+  border-radius: 3px;
+  color: #ffffff;
+}
+
+.footerBrand {
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .paletteBackdrop,
+  .resultRow {
+    transition: none !important;
+    animation: none !important;
+  }
+}

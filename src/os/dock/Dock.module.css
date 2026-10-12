@@ -1,0 +1,411 @@
+/* ==========================================================================
+   Elyx OS 1.0 — Dock & Taskbar Styles
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   MACOS FLOATING DOCK
+   -------------------------------------------------------------------------- */
+.dockRoot {
+  position: fixed;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9000;
+  display: flex;
+  justify-content: center;
+  pointer-events: auto;
+  transition: transform var(--elyx-duration-slow, 280ms) var(--elyx-ease-spring, cubic-bezier(0.16, 1, 0.3, 1)),
+              opacity var(--elyx-duration-normal, 200ms) ease;
+}
+
+.dockHidden {
+  transform: translateX(-50%) translateY(calc(100% + 24px));
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Hotzone for auto-hide hover trigger */
+.dockHotZone {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 12px;
+  z-index: 8999;
+}
+
+.dockContainer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--elyx-surface-glass-heavy, rgba(15, 23, 42, 0.72));
+  backdrop-filter: var(--elyx-glass-blur-lg, blur(32px));
+  -webkit-backdrop-filter: var(--elyx-glass-blur-lg, blur(32px));
+  border-radius: 22px;
+  border: 1px solid var(--elyx-glass-border, rgba(255, 255, 255, 0.14));
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.55),
+              0 4px 12px rgba(0, 0, 0, 0.25),
+              inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  user-select: none;
+}
+
+.dockItemContainer {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.dockItemBtn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  margin: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: transform;
+}
+
+.dockItemBtn:hover {
+  transform: translateY(-5px) scale(1.12);
+}
+
+.dockItemBtn:active {
+  transform: translateY(-2px) scale(1.04);
+}
+
+.dockIconBadge {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3),
+              inset 0 1px 1px rgba(255, 255, 255, 0.25);
+  transition: box-shadow 0.2s ease;
+}
+
+.itemActive .dockIconBadge {
+  box-shadow: 0 0 0 2px var(--elyx-accent-primary, #6366f1),
+              0 6px 16px rgba(99, 102, 241, 0.45);
+}
+
+.launcherBadge {
+  background: linear-gradient(135deg, #6366f1, #a855f7) !important;
+}
+
+.searchBadge {
+  background: linear-gradient(135deg, #0ea5e9, #3b82f6) !important;
+}
+
+.overviewBadge {
+  background: linear-gradient(135deg, #8b5cf6, #ec4899) !important;
+}
+
+/* Running indicator dot beneath icon */
+.runningIndicator {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background-color: var(--elyx-text-muted, rgba(255, 255, 255, 0.55));
+  margin-top: 3px;
+  transition: all 0.2s ease;
+}
+
+.runningIndicatorActive {
+  width: 14px;
+  height: 4px;
+  border-radius: 2px;
+  background-color: var(--elyx-accent-primary, #6366f1);
+  box-shadow: 0 0 8px rgba(99, 102, 241, 0.8);
+}
+
+.runningIndicatorMinimized {
+  background-color: #f59e0b;
+}
+
+.dockDivider {
+  width: 1px;
+  height: 32px;
+  background: var(--elyx-glass-border-subtle, rgba(255, 255, 255, 0.12));
+  margin: 0 4px;
+}
+
+/* Floating Tooltip */
+.tooltip {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  background: var(--elyx-surface-modal, rgba(15, 23, 42, 0.94));
+  border: 1px solid var(--elyx-glass-border, rgba(255, 255, 255, 0.12));
+  backdrop-filter: blur(16px);
+  color: var(--elyx-text-primary, #ffffff);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 8px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  z-index: 9999;
+}
+
+.dockItemBtn:hover .tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+.tooltipTag {
+  font-size: 0.65rem;
+  color: var(--elyx-text-muted, #94a3b8);
+  background: rgba(255, 255, 255, 0.08);
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
+/* --------------------------------------------------------------------------
+   CONTEXT MENU (POPOVER)
+   -------------------------------------------------------------------------- */
+.contextMenu {
+  position: fixed;
+  width: 200px;
+  background: var(--elyx-surface-modal, rgba(15, 23, 42, 0.95));
+  backdrop-filter: var(--elyx-glass-blur-lg, blur(28px));
+  -webkit-backdrop-filter: var(--elyx-glass-blur-lg, blur(28px));
+  border: 1px solid var(--elyx-glass-border, rgba(255, 255, 255, 0.14));
+  border-radius: 12px;
+  padding: 6px;
+  box-shadow: var(--elyx-shadow-context, 0 16px 40px rgba(0, 0, 0, 0.6));
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  animation: contextFadeIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes contextFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.contextHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--elyx-text-primary, #ffffff);
+}
+
+.contextIcon {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+}
+
+.contextTitle {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.contextItem {
+  background: transparent;
+  border: none;
+  color: var(--elyx-text-primary, #ffffff);
+  font-size: 0.78125rem;
+  font-weight: 500;
+  text-align: left;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: background-color 0.12s ease;
+}
+
+.contextItem:hover {
+  background-color: var(--elyx-accent-primary, #6366f1);
+}
+
+.contextDanger {
+  color: var(--elyx-status-error, #f43f5e);
+}
+
+.contextItem:hover .contextDanger {
+  color: #ffffff;
+}
+
+.contextDivider {
+  height: 1px;
+  background: var(--elyx-glass-border-subtle, rgba(255, 255, 255, 0.08));
+  margin: 4px 0;
+}
+
+/* --------------------------------------------------------------------------
+   WINDOWS 11 TASKBAR MODE
+   -------------------------------------------------------------------------- */
+.taskbarRoot {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 48px;
+  background: var(--elyx-surface-glass-heavy, rgba(15, 23, 42, 0.88));
+  backdrop-filter: var(--elyx-glass-blur-lg, blur(32px));
+  -webkit-backdrop-filter: var(--elyx-glass-blur-lg, blur(32px));
+  border-top: 1px solid var(--elyx-glass-border, rgba(255, 255, 255, 0.12));
+  z-index: 9000;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.35);
+}
+
+.taskbarLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.taskbarStartBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--elyx-accent-primary, #818cf8);
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+
+.taskbarStartBtn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  transform: scale(1.05);
+}
+
+.taskbarBtnActive {
+  background: rgba(99, 102, 241, 0.25) !important;
+}
+
+.taskbarSearchBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  padding: 4px 12px;
+  color: var(--elyx-text-muted, #94a3b8);
+  cursor: pointer;
+  font-size: 0.8125rem;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.taskbarSearchBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+.taskbarSearchText {
+  font-size: 0.78125rem;
+}
+
+.taskbarSearchKbd {
+  font-size: 0.6875rem;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.taskbarItemsArea {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  justify-content: center;
+  flex: 1;
+}
+
+.taskbarItemsArea .dockIconBadge {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+}
+
+.taskbarItemsArea .dockItemBtn {
+  padding: 2px 4px;
+}
+
+.taskbarDivider {
+  width: 1px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 0 4px;
+}
+
+.taskbarRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.taskbarTrayBtn {
+  background: transparent;
+  border: none;
+  color: var(--elyx-text-muted, #94a3b8);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.taskbarTrayBtn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+/* --------------------------------------------------------------------------
+   REDUCED MOTION
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .dockItemBtn,
+  .dockRoot,
+  .contextMenu,
+  .tooltip {
+    transition: none !important;
+    animation: none !important;
+  }
+}

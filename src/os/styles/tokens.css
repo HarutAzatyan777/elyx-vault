@@ -1,0 +1,272 @@
+/**
+ * Elyx OS 1.0 — Unified Design System Tokens
+ * 
+ * Fusion of:
+ * - macOS-inspired visual elegance & frosted glass surfaces
+ * - Windows 11-inspired window hierarchy, acrylic depth & snap geometry
+ * - Linux GNOME-inspired virtual workspaces & tactile clarity
+ * - iOS-inspired fluid squircle curves, gesture targets & spring physics
+ * - Android-inspired dynamic accent customization
+ * - Signature Elyx zero-knowledge branding & neon accents
+ */
+
+:root {
+  /* ========================================================================
+     1. COLOR PALETTE — DARK MODE (DEFAULT HIGH-PERFORMANCE DESKTOP OS)
+     ======================================================================== */
+  
+  /* Brand Signatures */
+  --elyx-brand-primary: #6366f1;         /* Electric Indigo */
+  --elyx-brand-secondary: #06b6d4;       /* Neon Cyan */
+  --elyx-brand-gradient: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #06b6d4 100%);
+  --elyx-brand-glow: rgba(99, 102, 241, 0.45);
+  --elyx-brand-glow-cyan: rgba(6, 182, 212, 0.4);
+
+  /* Semantic Status */
+  --elyx-status-online: #10b981;
+  --elyx-status-online-glow: rgba(16, 185, 129, 0.4);
+  --elyx-status-warning: #f59e0b;
+  --elyx-status-warning-glow: rgba(245, 158, 11, 0.4);
+  --elyx-status-danger: #f43f5e;
+  --elyx-status-danger-glow: rgba(244, 63, 94, 0.45);
+  --elyx-status-info: #0284c7;
+  --elyx-status-info-glow: rgba(2, 132, 199, 0.4);
+
+  /* Core Canvas & Surfaces (macOS Dark & Windows 11 Acrylic) */
+  --elyx-canvas-base: #030712;
+  --elyx-surface-desktop: #060b1d;
+  --elyx-surface-panel: rgba(11, 19, 43, 0.82);
+  --elyx-surface-dock: rgba(10, 17, 38, 0.72);
+  --elyx-surface-window-active: rgba(15, 23, 42, 0.88);
+  --elyx-surface-window-inactive: rgba(11, 18, 33, 0.78);
+  --elyx-surface-window-header: rgba(15, 23, 42, 0.92);
+  --elyx-surface-card: rgba(17, 24, 48, 0.75);
+  --elyx-surface-card-hover: rgba(30, 41, 69, 0.85);
+  --elyx-surface-card-active: rgba(37, 50, 84, 0.95);
+  --elyx-surface-input: rgba(15, 23, 42, 0.7);
+  --elyx-surface-input-focus: rgba(30, 41, 59, 0.85);
+  --elyx-surface-modal: rgba(11, 18, 36, 0.94);
+  --elyx-surface-popover: rgba(13, 21, 44, 0.96);
+  --elyx-surface-tooltip: rgba(3, 7, 18, 0.95);
+
+  /* Glassmorphism & Translucency */
+  --elyx-glass-specular: inset 0 1px 1px 0 rgba(255, 255, 255, 0.12), inset 0 -1px 1px 0 rgba(0, 0, 0, 0.35);
+  --elyx-glass-specular-active: inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.22), inset 0 -1px 1px 0 rgba(0, 0, 0, 0.45);
+  --elyx-glass-border: rgba(255, 255, 255, 0.09);
+  --elyx-glass-border-subtle: rgba(255, 255, 255, 0.05);
+  --elyx-glass-border-focus: rgba(99, 102, 241, 0.55);
+  --elyx-glass-blur-sm: blur(10px) saturate(180%);
+  --elyx-glass-blur-md: blur(20px) saturate(190%);
+  --elyx-glass-blur-lg: blur(36px) saturate(210%);
+  --elyx-glass-blur-dock: blur(28px) saturate(200%);
+
+  /* Typography / Text Colors */
+  --elyx-text-primary: #f8fafc;
+  --elyx-text-secondary: #cbd5e1;
+  --elyx-text-muted: #94a3b8;
+  --elyx-text-dim: #64748b;
+  --elyx-text-disabled: #475569;
+  --elyx-text-inverse: #020617;
+  --elyx-text-accent: #818cf8;
+
+  /* Window Titlebar Traffic Light Controls (macOS Elegance) */
+  --elyx-traffic-close: #ff5f56;
+  --elyx-traffic-close-hover: #e0443e;
+  --elyx-traffic-minimize: #ffbd2e;
+  --elyx-traffic-minimize-hover: #dea123;
+  --elyx-traffic-maximize: #27c93f;
+  --elyx-traffic-maximize-hover: #1aab29;
+
+  /* ========================================================================
+     2. SPACING & SIZING TOKENS
+     ======================================================================== */
+  --elyx-space-2xs: 2px;
+  --elyx-space-xs: 4px;
+  --elyx-space-sm: 8px;
+  --elyx-space-md: 12px;
+  --elyx-space-lg: 16px;
+  --elyx-space-xl: 20px;
+  --elyx-space-2xl: 24px;
+  --elyx-space-3xl: 32px;
+  --elyx-space-4xl: 40px;
+
+  /* Touch Target Minimum (iOS HIG compliance) */
+  --elyx-touch-target-min: 44px;
+
+  /* OS Shell Dimensional Standards */
+  --elyx-topbar-height: 38px;
+  --elyx-topbar-mobile-height: 48px;
+  --elyx-dock-height: 64px;
+  --elyx-dock-icon-size: 46px;
+  --elyx-dock-icon-size-active: 58px;
+  --elyx-window-titlebar-height: 40px;
+  --elyx-window-border-width: 1px;
+  --elyx-snap-threshold: 24px;
+
+  /* ========================================================================
+     3. BORDER RADII (iOS SQUIRCLES & MODERN OS GEOMETRY)
+     ======================================================================== */
+  --elyx-radius-xs: 4px;
+  --elyx-radius-sm: 6px;
+  --elyx-radius-md: 10px;
+  --elyx-radius-lg: 14px;
+  --elyx-radius-xl: 18px;
+  --elyx-radius-2xl: 24px;
+  --elyx-radius-pill: 9999px;
+  --elyx-radius-window: 14px;
+  --elyx-radius-dock: 22px;
+  --elyx-radius-squircle: 22.5%;
+
+  /* ========================================================================
+     4. ELEVATION & SHADOWS
+     ======================================================================== */
+  --elyx-shadow-level-0: none;
+  --elyx-shadow-level-1: 0 2px 8px -1px rgba(0, 0, 0, 0.35), 0 1px 3px -1px rgba(0, 0, 0, 0.25);
+  --elyx-shadow-level-2: 0 8px 16px -4px rgba(0, 0, 0, 0.45), 0 3px 6px -2px rgba(0, 0, 0, 0.35);
+  --elyx-shadow-level-3: 0 16px 32px -8px rgba(0, 0, 0, 0.55), 0 6px 12px -3px rgba(0, 0, 0, 0.4);
+  --elyx-shadow-level-4: 0 24px 48px -12px rgba(0, 0, 0, 0.65), 0 12px 24px -6px rgba(0, 0, 0, 0.45);
+  --elyx-shadow-level-5: 0 36px 72px -16px rgba(0, 0, 0, 0.8), 0 18px 36px -8px rgba(0, 0, 0, 0.5);
+
+  /* Specific OS Component Shadows */
+  --elyx-shadow-dock: 0 18px 45px -8px rgba(0, 0, 0, 0.65), 0 6px 16px rgba(0, 0, 0, 0.35);
+  --elyx-shadow-window-inactive: 0 12px 28px -6px rgba(0, 0, 0, 0.55), 0 4px 10px rgba(0, 0, 0, 0.35);
+  --elyx-shadow-window-active: 0 28px 65px -12px rgba(0, 0, 0, 0.75), 0 10px 24px -4px rgba(99, 102, 241, 0.2);
+  --elyx-shadow-modal: 0 35px 80px -15px rgba(0, 0, 0, 0.85), 0 12px 30px -5px rgba(0, 0, 0, 0.6);
+  --elyx-shadow-snap-preview: 0 0 0 2px var(--elyx-brand-primary), 0 12px 32px rgba(99, 102, 241, 0.35);
+
+  /* ========================================================================
+     5. Z-INDEX LAYERING ARCHITECTURE
+     ======================================================================== */
+  --elyx-z-wallpaper: 0;
+  --elyx-z-desktop-icons: 10;
+  --elyx-z-window-minimized: 20;
+  --elyx-z-window-base: 100;
+  --elyx-z-window-focused: 500;
+  --elyx-z-snap-indicator: 700;
+  --elyx-z-dock: 800;
+  --elyx-z-topbar: 900;
+  --elyx-z-launcher: 1000;
+  --elyx-z-workspaces-overview: 1100;
+  --elyx-z-popover: 1200;
+  --elyx-z-notification: 1300;
+  --elyx-z-modal: 1400;
+  --elyx-z-context-menu: 1500;
+  --elyx-z-screen-lock: 2000;
+
+  /* ========================================================================
+     6. MOTION & ANIMATION TIMING (SPRING & FLUID PHYSICS)
+     ======================================================================== */
+  --elyx-ease-spring-snappy: cubic-bezier(0.19, 1, 0.22, 1);
+  --elyx-ease-spring-gentle: cubic-bezier(0.32, 0.72, 0, 1);
+  --elyx-ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --elyx-ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --elyx-ease-out: cubic-bezier(0, 0, 0.2, 1);
+
+  --elyx-duration-instant: 100ms;
+  --elyx-duration-fast: 180ms;
+  --elyx-duration-normal: 260ms;
+  --elyx-duration-slow: 380ms;
+  --elyx-duration-deliberate: 520ms;
+
+  /* ========================================================================
+     7. TYPOGRAPHY SCALES
+     ======================================================================== */
+  --elyx-font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI Variable', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  --elyx-font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+
+  --elyx-text-size-2xs: 10px;
+  --elyx-text-size-xs: 11px;
+  --elyx-text-size-sm: 13px;
+  --elyx-text-size-base: 14px;
+  --elyx-text-size-md: 16px;
+  --elyx-text-size-lg: 18px;
+  --elyx-text-size-xl: 20px;
+  --elyx-text-size-2xl: 24px;
+  --elyx-text-size-3xl: 30px;
+
+  --elyx-line-height-tight: 1.2;
+  --elyx-line-height-normal: 1.45;
+  --elyx-line-height-relaxed: 1.6;
+
+  /* ========================================================================
+     8. WORKSPACE & VIRTUAL DESKTOP TOKENS (GNOME-INSPIRED)
+     ======================================================================== */
+  --elyx-workspace-gap: 16px;
+  --elyx-workspace-scale-overview: 0.72;
+  --elyx-workspace-pill-height: 28px;
+  --elyx-workspace-pill-active: var(--elyx-brand-primary);
+  --elyx-workspace-pill-inactive: rgba(255, 255, 255, 0.2);
+}
+
+/* ========================================================================
+   LIGHT THEME OVERRIDES (macOS Light & Windows 11 Light Mica)
+   ======================================================================== */
+[data-theme='light'] {
+  --elyx-canvas-base: #f0f4f8;
+  --elyx-surface-desktop: #e2e8f0;
+  --elyx-surface-panel: rgba(255, 255, 255, 0.85);
+  --elyx-surface-dock: rgba(248, 250, 252, 0.82);
+  --elyx-surface-window-active: rgba(255, 255, 255, 0.94);
+  --elyx-surface-window-inactive: rgba(241, 245, 249, 0.86);
+  --elyx-surface-window-header: rgba(255, 255, 255, 0.96);
+  --elyx-surface-card: rgba(255, 255, 255, 0.88);
+  --elyx-surface-card-hover: rgba(241, 245, 249, 0.95);
+  --elyx-surface-card-active: rgba(226, 232, 240, 0.98);
+  --elyx-surface-input: rgba(255, 255, 255, 0.9);
+  --elyx-surface-input-focus: #ffffff;
+  --elyx-surface-modal: rgba(255, 255, 255, 0.98);
+  --elyx-surface-popover: rgba(255, 255, 255, 0.97);
+  --elyx-surface-tooltip: rgba(15, 23, 42, 0.94);
+
+  --elyx-glass-specular: inset 0 1px 1px 0 rgba(255, 255, 255, 0.8), inset 0 -1px 1px 0 rgba(0, 0, 0, 0.04);
+  --elyx-glass-specular-active: inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.95), inset 0 -1px 1px 0 rgba(0, 0, 0, 0.08);
+  --elyx-glass-border: rgba(15, 23, 42, 0.08);
+  --elyx-glass-border-subtle: rgba(15, 23, 42, 0.04);
+  --elyx-glass-border-focus: rgba(79, 70, 229, 0.6);
+
+  --elyx-text-primary: #0f172a;
+  --elyx-text-secondary: #334155;
+  --elyx-text-muted: #64748b;
+  --elyx-text-dim: #94a3b8;
+  --elyx-text-disabled: #cbd5e1;
+  --elyx-text-inverse: #f8fafc;
+  --elyx-text-accent: #4f46e5;
+
+  --elyx-shadow-level-1: 0 2px 8px -1px rgba(15, 23, 42, 0.08), 0 1px 3px -1px rgba(15, 23, 42, 0.04);
+  --elyx-shadow-level-2: 0 8px 18px -4px rgba(15, 23, 42, 0.12), 0 3px 6px -2px rgba(15, 23, 42, 0.06);
+  --elyx-shadow-level-3: 0 16px 32px -8px rgba(15, 23, 42, 0.16), 0 6px 12px -3px rgba(15, 23, 42, 0.08);
+  --elyx-shadow-level-4: 0 24px 48px -12px rgba(15, 23, 42, 0.2), 0 12px 24px -6px rgba(15, 23, 42, 0.1);
+  --elyx-shadow-level-5: 0 36px 72px -16px rgba(15, 23, 42, 0.24), 0 18px 36px -8px rgba(15, 23, 42, 0.12);
+
+  --elyx-shadow-dock: 0 14px 38px -6px rgba(15, 23, 42, 0.18), 0 4px 12px rgba(15, 23, 42, 0.08);
+  --elyx-shadow-window-inactive: 0 10px 24px -6px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06);
+  --elyx-shadow-window-active: 0 24px 55px -10px rgba(15, 23, 42, 0.22), 0 8px 20px -4px rgba(79, 70, 229, 0.15);
+  --elyx-shadow-modal: 0 30px 70px -12px rgba(15, 23, 42, 0.26), 0 10px 25px -4px rgba(15, 23, 42, 0.14);
+
+  --elyx-workspace-pill-inactive: rgba(0, 0, 0, 0.15);
+}
+
+/* ========================================================================
+   REDUCED MOTION OVERRIDES (ACCESSIBILITY & PREFERENCES)
+   ======================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --elyx-duration-instant: 0ms !important;
+    --elyx-duration-fast: 0ms !important;
+    --elyx-duration-normal: 0ms !important;
+    --elyx-duration-slow: 0ms !important;
+    --elyx-duration-deliberate: 0ms !important;
+    --elyx-ease-spring-snappy: linear !important;
+    --elyx-ease-spring-gentle: linear !important;
+    --elyx-ease-standard: linear !important;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

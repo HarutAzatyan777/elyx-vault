@@ -1,0 +1,42 @@
+.widgetsPanel {
+  position: absolute;
+  top: calc(var(--elyx-topbar-height, 38px) + 1.25rem);
+  right: 1.5rem;
+  width: 280px;
+  max-height: calc(100vh - var(--elyx-topbar-height, 38px) - 3rem);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+  z-index: var(--elyx-z-desktop-icons, 10);
+  pointer-events: auto;
+}
+
+/* Custom scrollbar for widgets strip */
+.widgetsPanel::-webkit-scrollbar {
+  width: 4px;
+}
+
+.widgetsPanel::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+
+.widgetsPanel::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+@media (max-width: 1024px) {
+  .widgetsPanel {
+    width: 240px;
+    right: 1rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .widgetsPanel {
+    display: none;
+  }
+}

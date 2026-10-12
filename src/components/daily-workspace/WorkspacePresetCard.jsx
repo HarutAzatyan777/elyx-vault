@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { extractDomain, getFaviconUrl } from '../../utils/workspaceValidation.js';
+import { useOS } from '../../os/hooks/useOS.js';
 import styles from './DailyWorkspace.module.css';
 
 // SVG Icon Mapping
@@ -50,9 +51,35 @@ export function WorkspacePresetCard({
   onDelete,
 }) {
   const [showUrlPreview, setShowUrlPreview] = useState(false);
+  const osContext = useOS();
+  const workspaces = osContext?.workspaces || [];
+  const createWorkspace = osContext?.createWorkspace;
+  const switchWorkspace = osContext?.switchWorkspace;
+  const addNotification = osContext?.addNotification;
 
   const accentColor = preset.color || '#8b5cf6';
   const urls = preset.urls || [];
+
+  const handleOpenVirtualDesktop = (e) => {
+    e.stopPropagation();
+    const targetName = preset.name || 'Workspace';
+    const existing = workspaces.find((ws) => ws.name.toLowerCase() === targetName.toLowerCase());
+    if (existing) {
+      switchWorkspace?.(existing.id);
+      addNotification?.({
+        type: 'info',
+        title: 'Virtual Desktop Switched',
+        message: `Switched to existing desktop: ${existing.name}`,
+      });
+    } else {
+      createWorkspace?.(targetName);
+      addNotification?.({
+        type: 'success',
+        title: 'Virtual Desktop Created',
+        message: `Created dedicated virtual desktop: ${targetName}`,
+      });
+    }
+  };
 
   return (
     <div
@@ -182,7 +209,16 @@ export function WorkspacePresetCard({
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="16" height="16">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
           </svg>
-          <span>Launch Workspace</span>
+          <span>Launch Session</span>
+        </button>
+
+        <button
+          type="button"
+          className={styles.virtualDesktopBtn}
+          onClick={handleOpenVirtualDesktop}
+          title="Open or create an isolated OS Virtual Desktop for this preset"
+        >
+          <span>🖥️ Open in Virtual Desktop</span>
         </button>
       </div>
     </div>

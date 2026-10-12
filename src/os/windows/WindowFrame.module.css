@@ -1,0 +1,436 @@
+.windowContainer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--elyx-surface-window-active, rgba(15, 23, 42, 0.94));
+  backdrop-filter: var(--elyx-glass-blur-lg, blur(36px));
+  -webkit-backdrop-filter: var(--elyx-glass-blur-lg, blur(36px));
+  border-radius: var(--elyx-radius-window, 14px);
+  border: 1px solid var(--elyx-glass-border, rgba(255, 255, 255, 0.12));
+  box-shadow: var(--elyx-glass-specular-active), var(--elyx-shadow-window-active);
+  overflow: hidden;
+  will-change: transform, width, height;
+  transition: box-shadow var(--elyx-duration-fast) var(--elyx-ease-standard),
+              border-color var(--elyx-duration-fast) var(--elyx-ease-standard),
+              opacity var(--elyx-duration-fast) var(--elyx-ease-standard),
+              visibility var(--elyx-duration-fast);
+}
+
+.isInactive {
+  background: var(--elyx-surface-window-inactive, rgba(11, 18, 33, 0.88));
+  border-color: var(--elyx-glass-border-subtle, rgba(255, 255, 255, 0.05));
+  box-shadow: var(--elyx-glass-specular), var(--elyx-shadow-window-inactive);
+}
+
+.isFocused {
+  border-color: var(--elyx-glass-border-focus, rgba(99, 102, 241, 0.55));
+  box-shadow: var(--elyx-glass-specular-active), var(--elyx-shadow-window-active);
+}
+
+/* Maximized Window */
+.isMaximized {
+  border-radius: 0 !important;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+}
+
+/* Minimized Window: Hidden visually but remains mounted in DOM to protect data safety! */
+.isMinimized {
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: scale(0.92) !important;
+}
+
+/* Inactive Virtual Desktop: Hidden without unmounting to protect state & subscriptions */
+.isInactiveWorkspace {
+  display: none !important;
+}
+
+/* Titlebar */
+.titlebar {
+  height: var(--elyx-window-titlebar-height, 40px);
+  background: var(--elyx-surface-window-header, rgba(15, 23, 42, 0.96));
+  border-bottom: 1px solid var(--elyx-glass-border-subtle, rgba(255, 255, 255, 0.08));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0.85rem;
+  user-select: none;
+  cursor: grab;
+  flex-shrink: 0;
+}
+
+.titlebar:active {
+  cursor: grabbing;
+}
+
+.trafficLights {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 70px;
+}
+
+.trafficBtn {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.trafficBtn:hover {
+  transform: scale(1.12);
+}
+
+.trafficClose {
+  background-color: var(--elyx-traffic-close, #ff5f56);
+}
+.trafficClose:hover {
+  background-color: var(--elyx-traffic-close-hover, #e0443e);
+}
+
+.trafficMin {
+  background-color: var(--elyx-traffic-minimize, #ffbd2e);
+}
+.trafficMin:hover {
+  background-color: var(--elyx-traffic-minimize-hover, #dea123);
+}
+
+.trafficMax {
+  background-color: var(--elyx-traffic-maximize, #27c93f);
+}
+.trafficMax:hover {
+  background-color: var(--elyx-traffic-maximize-hover, #1aab29);
+}
+
+.titleArea {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--elyx-text-primary, #ffffff);
+  pointer-events: none;
+}
+
+.isInactive .titleArea {
+  color: var(--elyx-text-muted, #94a3b8);
+}
+
+.titleIconBadge {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+}
+
+.titleText {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 320px;
+}
+
+.titlebarSpacer {
+  width: 70px;
+}
+
+/* Window Content Body */
+.windowContent {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  background-color: var(--elyx-surface-window-active);
+}
+
+/* --------------------------------------------------------------------------
+   8-Way Resize Handles
+   -------------------------------------------------------------------------- */
+.resizeHandle {
+  position: absolute;
+  z-index: 50;
+}
+
+.handleN {
+  top: 0;
+  left: 8px;
+  right: 8px;
+  height: 6px;
+  cursor: ns-resize;
+}
+
+.handleS {
+  bottom: 0;
+  left: 8px;
+  right: 8px;
+  height: 6px;
+  cursor: ns-resize;
+}
+
+.handleE {
+  top: 8px;
+  bottom: 8px;
+  right: 0;
+  width: 6px;
+  cursor: ew-resize;
+}
+
+.handleW {
+  top: 8px;
+  bottom: 8px;
+  left: 0;
+  width: 6px;
+  cursor: ew-resize;
+}
+
+.handleNW {
+  top: 0;
+  left: 0;
+  width: 12px;
+  height: 12px;
+  cursor: nwse-resize;
+}
+
+.handleNE {
+  top: 0;
+  right: 0;
+  width: 12px;
+  height: 12px;
+  cursor: nesw-resize;
+}
+
+.handleSW {
+  bottom: 0;
+  left: 0;
+  width: 12px;
+  height: 12px;
+  cursor: nesw-resize;
+}
+
+.handleSE {
+  bottom: 0;
+  right: 0;
+  width: 12px;
+  height: 12px;
+  cursor: nwse-resize;
+}
+
+/* --------------------------------------------------------------------------
+   SNAP LAYOUTS FLYOUT (Windows 11 inspired)
+   -------------------------------------------------------------------------- */
+.maxBtnWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.snapFlyout {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: -20px;
+  width: 220px;
+  background: var(--elyx-surface-modal, rgba(15, 23, 42, 0.96));
+  backdrop-filter: var(--elyx-glass-blur-lg, blur(28px));
+  -webkit-backdrop-filter: var(--elyx-glass-blur-lg, blur(28px));
+  border: 1px solid var(--elyx-glass-border, rgba(255, 255, 255, 0.16));
+  border-radius: 12px;
+  padding: 10px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: flyoutFadeIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes flyoutFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.snapFlyoutHeader {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--elyx-text-muted, #94a3b8);
+  letter-spacing: 0.05em;
+  padding: 0 2px;
+}
+
+.snapGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.snapTemplate {
+  height: 44px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  padding: 3px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.templateQuadrant {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+
+.templateRows {
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+
+.snapZone {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.12s ease;
+}
+
+.snapZone:hover {
+  background: var(--elyx-accent-primary, #6366f1);
+  border-style: solid;
+  border-color: #ffffff;
+}
+
+/* Snapped state without full zero radius if desirable */
+.isSnapped {
+  border-radius: 8px;
+}
+
+/* Edge Snap Ghost Overlay */
+.snapGhostOverlay {
+  position: fixed;
+  background: rgba(99, 102, 241, 0.22);
+  backdrop-filter: blur(12px);
+  border: 2px dashed rgba(99, 102, 241, 0.8);
+  border-radius: 12px;
+  z-index: 8500;
+  pointer-events: none;
+  animation: ghostPulse 1s ease infinite alternate;
+}
+
+@keyframes ghostPulse {
+  from { opacity: 0.7; }
+  to { opacity: 1; }
+}
+
+.ghostLeft {
+  top: 38px;
+  left: 0;
+  width: 50vw;
+  height: calc(100vh - 38px);
+}
+
+.ghostRight {
+  top: 38px;
+  left: 50vw;
+  width: 50vw;
+  height: calc(100vh - 38px);
+}
+
+.ghostTop {
+  top: 38px;
+  left: 0;
+  width: 100vw;
+  height: calc(100vh - 38px);
+}
+
+/* Titlebar Context Menu */
+.titlebarContextMenu {
+  position: fixed;
+  width: 210px;
+  background: var(--elyx-surface-modal, rgba(15, 23, 42, 0.96));
+  backdrop-filter: var(--elyx-glass-blur-lg, blur(28px));
+  -webkit-backdrop-filter: var(--elyx-glass-blur-lg, blur(28px));
+  border: 1px solid var(--elyx-glass-border, rgba(255, 255, 255, 0.15));
+  border-radius: 12px;
+  padding: 6px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65);
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+}
+
+.menuHeader {
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--elyx-text-muted, #94a3b8);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.menuSubHeader {
+  padding: 4px 8px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--elyx-text-muted, #94a3b8);
+}
+
+.menuDivider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 4px 0;
+}
+
+.menuItem {
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 0.78125rem;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: background-color 0.12s ease;
+}
+
+.menuItem:hover {
+  background: var(--elyx-accent-primary, #6366f1);
+}
+
+.menuItemActive {
+  background: rgba(99, 102, 241, 0.3);
+  font-weight: 600;
+}
+
+.menuItemDanger {
+  color: #f43f5e;
+}
+
+.menuItemDanger:hover {
+  background: #f43f5e;
+  color: #ffffff;
+}
+

@@ -1,0 +1,346 @@
+/* ==========================================================================
+   Elyx OS 1.0 — System Settings App Styles
+   ========================================================================== */
+
+.settingsRoot {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  background: var(--elyx-surface-window-body, #0a0f1d);
+  color: var(--elyx-text-primary, #ffffff);
+  overflow: hidden;
+}
+
+.settingsSidebar {
+  width: 220px;
+  background: var(--elyx-surface-glass-heavy, rgba(15, 23, 42, 0.7));
+  border-right: 1px solid var(--elyx-glass-border-subtle, rgba(255, 255, 255, 0.08));
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.sidebarHeader {
+  padding: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.sidebarTitle {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--elyx-text-muted, #94a3b8);
+}
+
+.tabsNav {
+  padding: 10px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tabBtn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: transparent;
+  border: none;
+  color: var(--elyx-text-primary, #ffffff);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.12s ease;
+}
+
+.tabBtn:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.tabActive {
+  background: var(--elyx-accent-primary, #6366f1) !important;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
+}
+
+.settingsContent {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+  background: var(--elyx-surface-window-body, #0b1120);
+}
+
+.section {
+  max-width: 680px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sectionHeading {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.sectionDesc {
+  font-size: 0.8125rem;
+  color: var(--elyx-text-muted, #94a3b8);
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* Wallpaper Grid */
+.wallpaperGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.wallpaperCard {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.wallpaperCard:hover {
+  background: rgba(255, 255, 255, 0.08);
+  transform: translateY(-2px);
+}
+
+.cardActive {
+  border-color: var(--elyx-accent-primary, #6366f1) !important;
+  box-shadow: 0 0 0 2px var(--elyx-accent-primary, #6366f1);
+}
+
+.previewBox {
+  width: 100%;
+  height: 70px;
+  border-radius: 8px;
+}
+
+.wallpaperName {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #ffffff;
+  text-align: center;
+}
+
+/* Dock Setting */
+.settingGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.groupHeading {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.modeChooser {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.modeBtn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+}
+
+.modeBtn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.modeActive {
+  background: rgba(99, 102, 241, 0.18) !important;
+  border-color: var(--elyx-accent-primary, #6366f1) !important;
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.3);
+}
+
+.modeIcon {
+  font-size: 1.5rem;
+}
+
+.modeText strong {
+  display: block;
+  font-size: 0.8125rem;
+  color: #ffffff;
+}
+
+.modeText span {
+  font-size: 0.6875rem;
+  color: var(--elyx-text-muted, #94a3b8);
+}
+
+.toggleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin-top: 8px;
+}
+
+.toggleRow strong {
+  font-size: 0.8125rem;
+  display: block;
+}
+
+.toggleRow p {
+  font-size: 0.6875rem;
+  color: var(--elyx-text-muted, #94a3b8);
+  margin: 0;
+}
+
+.toggleBtn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  padding: 6px 14px;
+  color: #ffffff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.toggleOn {
+  background: var(--elyx-accent-primary, #6366f1) !important;
+}
+
+/* Security Tab */
+.statusBox {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.statusRow {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8125rem;
+  color: var(--elyx-text-muted, #94a3b8);
+}
+
+.unlockedText {
+  color: #10b981;
+  font-weight: 700;
+}
+
+.lockedText {
+  color: #f59e0b;
+  font-weight: 700;
+}
+
+.cipherText {
+  color: #ffffff;
+  font-family: monospace;
+}
+
+.dangerBtn {
+  background: #f43f5e;
+  border: none;
+  color: #ffffff;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.primaryBtn {
+  background: var(--elyx-accent-primary, #6366f1);
+  border: none;
+  color: #ffffff;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+/* About Tab */
+.specGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.specCard {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.specCard span {
+  font-size: 0.6875rem;
+  color: var(--elyx-text-muted, #94a3b8);
+  text-transform: uppercase;
+}
+
+.specCard strong {
+  font-size: 0.8125rem;
+  color: #ffffff;
+}
+
+.classicSwitchSection {
+  margin-top: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 16px;
+}
+
+.classicSwitchSection h3 {
+  font-size: 0.875rem;
+  margin: 0 0 6px 0;
+}
+
+.classicSwitchSection p {
+  font-size: 0.75rem;
+  color: var(--elyx-text-muted, #94a3b8);
+  margin: 0 0 12px 0;
+}
+
+.classicBtn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.classicBtn:hover {
+  background: rgba(255, 255, 255, 0.18);
+}

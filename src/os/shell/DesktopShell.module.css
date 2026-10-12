@@ -1,0 +1,267 @@
+.desktopShellRoot {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background-color: var(--elyx-canvas-base, #030712);
+  user-select: none;
+}
+
+/* Modals */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--elyx-z-modal, 1400);
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  box-sizing: border-box;
+}
+
+/* About Card */
+.aboutCard {
+  width: min(380px, 90vw);
+  background: var(--elyx-surface-modal, rgba(11, 18, 36, 0.95));
+  backdrop-filter: var(--elyx-glass-blur-lg, blur(36px));
+  -webkit-backdrop-filter: var(--elyx-glass-blur-lg, blur(36px));
+  border: 1px solid var(--elyx-glass-border, rgba(255, 255, 255, 0.12));
+  border-radius: var(--elyx-radius-2xl, 24px);
+  box-shadow: var(--elyx-glass-specular-active), var(--elyx-shadow-modal);
+  padding: 2rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.65rem;
+  animation: modalScale 0.2s cubic-bezier(0.19, 1, 0.22, 1);
+}
+
+@keyframes modalScale {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.aboutLogoCircle {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--elyx-radius-xl, 18px);
+  background: var(--elyx-brand-gradient, linear-gradient(135deg, #6366f1 0%, #06b6d4 100%));
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 10px 25px rgba(99, 102, 241, 0.45);
+  margin-bottom: 0.5rem;
+}
+
+.aboutTitle {
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: var(--elyx-text-primary, #ffffff);
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.aboutVersion {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--elyx-brand-secondary, #06b6d4);
+  margin: 0;
+}
+
+.aboutTagline {
+  font-size: 0.78rem;
+  color: var(--elyx-text-muted, #94a3b8);
+  margin: 0 0 0.5rem;
+}
+
+.aboutDetails {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--elyx-glass-border-subtle);
+  border-radius: var(--elyx-radius-md, 10px);
+  padding: 0.75rem 0.85rem;
+  font-size: 0.72rem;
+}
+
+.aboutRow {
+  display: flex;
+  justify-content: space-between;
+  color: var(--elyx-text-secondary, #cbd5e1);
+}
+
+.aboutRow span:first-child {
+  color: var(--elyx-text-dim, #64748b);
+  font-weight: 600;
+}
+
+.aboutCloseBtn {
+  margin-top: 0.5rem;
+  width: 100%;
+  padding: 0.55rem;
+  background: var(--elyx-brand-primary, #6366f1);
+  border: none;
+  border-radius: var(--elyx-radius-md, 10px);
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all var(--elyx-duration-fast);
+}
+
+.aboutCloseBtn:hover {
+  background: var(--elyx-brand-glow, #4f46e5);
+}
+
+/* System Settings Modal */
+.settingsModal {
+  width: min(540px, 92vw);
+  background: var(--elyx-surface-modal, rgba(11, 18, 36, 0.96));
+  backdrop-filter: var(--elyx-glass-blur-lg, blur(36px));
+  -webkit-backdrop-filter: var(--elyx-glass-blur-lg, blur(36px));
+  border: 1px solid var(--elyx-glass-border, rgba(255, 255, 255, 0.12));
+  border-radius: var(--elyx-radius-2xl, 24px);
+  box-shadow: var(--elyx-glass-specular-active), var(--elyx-shadow-modal);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  animation: modalScale 0.2s cubic-bezier(0.19, 1, 0.22, 1);
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.settingsHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--elyx-glass-border-subtle);
+  padding-bottom: 0.75rem;
+}
+
+.settingsTitle {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--elyx-text-primary, #ffffff);
+  margin: 0;
+}
+
+.modalCloseBtn {
+  background: transparent;
+  border: none;
+  color: var(--elyx-text-dim, #64748b);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.modalCloseBtn:hover {
+  color: #ffffff;
+}
+
+.settingsSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.settingsSectionTitle {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--elyx-text-secondary, #cbd5e1);
+  margin: 0;
+}
+
+.settingsDesc {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--elyx-text-muted, #94a3b8);
+  line-height: 1.4;
+}
+
+.wallpaperGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+}
+
+.wallpaperCard {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--elyx-glass-border-subtle);
+  border-radius: var(--elyx-radius-lg, 12px);
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  cursor: pointer;
+  transition: all var(--elyx-duration-fast);
+  text-align: left;
+}
+
+.wallpaperCard:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+.wallpaperActive {
+  border-color: var(--elyx-brand-primary, #6366f1) !important;
+  box-shadow: 0 0 12px rgba(99, 102, 241, 0.4);
+}
+
+.wallpaperPreview {
+  width: 100%;
+  height: 56px;
+  border-radius: var(--elyx-radius-sm, 6px);
+}
+
+.wallpaperName {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--elyx-text-primary, #ffffff);
+}
+
+.lockNowBtn,
+.classicSwitchBtn {
+  align-self: flex-start;
+  padding: 0.5rem 0.85rem;
+  border-radius: var(--elyx-radius-md, 8px);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--elyx-duration-fast);
+}
+
+.lockNowBtn {
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  color: #fbbf24;
+}
+
+.lockNowBtn:hover {
+  background: rgba(245, 158, 11, 0.28);
+}
+
+.classicSwitchBtn {
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  color: #c7d2fe;
+}
+
+.classicSwitchBtn:hover {
+  background: rgba(99, 102, 241, 0.28);
+  color: #ffffff;
+}
+
+.vaultLockedBadge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--elyx-status-warning, #f59e0b);
+}
