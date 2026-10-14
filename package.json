@@ -8,10 +8,13 @@
     "build": "npm run build:extension && vite build",
     "build:extension": "node scripts/build-extension.js",
     "lint": "oxlint",
+    "test:settings": "node src/os/settings/settings.test.js",
     "preview": "vite preview",
     "watch:extension": "node watch-extension.js",
     "deploy": "firebase deploy",
-    "deploy:hosting": "npm run build && firebase deploy --only hosting"
+    "deploy:hosting": "npm run build && firebase deploy --only hosting",
+    "test": "vitest run",
+    "test:rules": "firebase emulators:exec --config firebase.test.json --project demo-elyx-hardening --only firestore,database,storage \"vitest run tests/firebase.rules.test.js\""
   },
   "dependencies": {
     "@xterm/addon-fit": "^0.10.0",
@@ -24,14 +27,24 @@
     "react-router-dom": "^7.18.2"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@tailwindcss/postcss": "^4.3.3",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.8",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.3",
     "autoprefixer": "^10.5.4",
+    "fake-indexeddb": "^6.2.5",
+    "firebase-tools": "^15.33.0",
+    "jsdom": "^30.1.2",
     "oxlint": "^1.71.0",
     "postcss": "^8.5.24",
     "tailwindcss": "^4.3.3",
-    "vite": "^8.1.1"
+    "vite": "^8.1.1",
+    "vitest": "^5.0.4"
+  },
+  "overrides": {
+    "@grpc/grpc-js": "^1.14.6"
   }
 }

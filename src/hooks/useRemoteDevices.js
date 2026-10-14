@@ -41,9 +41,7 @@ export function useRemoteDevices() {
       uid,
       (data) => {
         setDevices(data);
-        if (data.length > 0 && !selectedDeviceId) {
-          setSelectedDeviceId(data[0].id);
-        }
+        setSelectedDeviceId(current => data.some(device => device.id === current) ? current : data[0]?.id || null);
         setLoading(false);
       },
       (err) => {

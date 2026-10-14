@@ -16,7 +16,7 @@ export const STORAGE_LOCATION_DEFS = [
     id: STORAGE_LOCATIONS.MEDIA,
     name: 'Media Vault',
     shortName: 'Media',
-    description: 'Zero-knowledge encrypted photos, 4K videos, and web streams',
+    description: 'Photos, videos, and optionally encrypted media links',
     icon: '📷',
     appId: 'media',
     color: '#ec4899',
@@ -84,7 +84,7 @@ export function normalizeMediaItem(item) {
     thumbnailUrl: item.thumbnailUrl || item.url || '',
     folder: item.category || 'All',
     updatedAt: item.createdAt || item.updatedAt || new Date().toISOString(),
-    isEncrypted: Boolean(item.isEncrypted !== false),
+    isEncrypted: Boolean(item.isEncrypted),
     metadata: {
       category: item.category || 'General',
       width: item.width,
@@ -111,8 +111,8 @@ export function normalizeNoteItem(note) {
     url: '',
     folder: note.tags && note.tags.length > 0 ? note.tags[0] : 'All Notes',
     updatedAt: note.updatedAt || note.createdAt || new Date().toISOString(),
-    isEncrypted: Boolean(note.isEncrypted !== false),
-    contentSnippet: content.slice(0, 300),
+    isEncrypted: Boolean(note.isEncrypted),
+    contentSnippet: note.isEncrypted ? '' : content.slice(0, 300),
     metadata: {
       tags: note.tags || [],
       isPinned: Boolean(note.isPinned),
@@ -138,7 +138,7 @@ export function normalizeTrackItem(track) {
     thumbnailUrl: track.coverUrl || '',
     folder: track.genre || 'All',
     updatedAt: track.createdAt || track.updatedAt || new Date().toISOString(),
-    isEncrypted: false,
+    isEncrypted: Boolean(track.isEncrypted),
     metadata: {
       artist: track.artist || 'Unknown Artist',
       genre: track.genre || 'General',

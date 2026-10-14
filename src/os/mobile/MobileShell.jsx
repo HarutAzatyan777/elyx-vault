@@ -1,13 +1,13 @@
+import { canUserLaunchApp } from '../registry/appRegistry.js';
+import NotificationsFlyout from '../shell/NotificationsFlyout.jsx';
+import { useTheme } from '../../context/ThemeContext.jsx';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useOS } from '../hooks/useOS.js';
 import { useMusic } from '../../context/MusicContext.jsx';
 import { WALLPAPER_PRESETS } from '../desktop/types.js';
 import {
-  loadDeviceMode,
   loadMobileNavStyle,
-  loadMobileTheme,
   MOBILE_NAV_STYLES,
-  MOBILE_PRESENTATION_MODES,
   MOBILE_THEMES,
   saveDeviceMode,
   saveMobileNavStyle,
@@ -25,6 +25,7 @@ import MobileAppSwitcher from './MobileAppSwitcher.jsx';
 import styles from './MobileShell.module.css';
 
 export function MobileShell({
+  systemNotice,
   user,
   access,
   projects = [],
@@ -44,16 +45,58 @@ export function MobileShell({
   isRTDBConnected = false,
   onSwitchToDesktop,
 }) {
-  const { toggleOSMode, settings } = useOS();
+  const { toggleOSMode, settings, updateSettings } = useOS();
+  const { theme: colorTheme } = useTheme();
   const { currentTrack, isPlaying } = useMusic();
 
   // Mobile Theme & Navigation Preferences
-  const [mobileTheme, setMobileTheme] = useState(loadMobileTheme);
+  const [mobileTheme, setMobileTheme] = useState(() => settings.mobileMode);
   const [navStyle, setNavStyle] = useState(loadMobileNavStyle);
 
+  useEffect(() => setMobileTheme(settings.mobileMode), [settings.mobileMode]);
+
   // Mobile Navigation & Screen States
-  const [activeAppId, setActiveAppId] = useState(null);
-  const [runningAppIds, setRunningAppIds] = useState([]);
+  const layoutKey = `elyx_mobile_layout:${user.uid}`;
+  const [recovered] = useState(() => {
+    try {
+      const input = JSON.parse(localStorage.getItem(layoutKey) || '{}');
+      const apps = Array.isArray(input.apps)
+        ? [
+            ...new Set(
+              input.apps.filter(
+                (id) =>
+                  typeof id === 'string' && canUserLaunchApp(id, access.role),
+              ),
+            ),
+          ].slice(0, 20)
+        : [];
+      return {
+        apps,
+        active: apps.includes(input.active) ? input.active : null,
+      };
+    } catch {
+      return { apps: [], active: null };
+    }
+  });
+  const [activeAppId, setActiveAppId] = useState(recovered.active);
+  const [runningAppIds, setRunningAppIds] = useState(recovered.apps);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem(
+          layoutKey,
+          JSON.stringify({ apps: runningAppIds, active: activeAppId }),
+        );
+      } catch {}
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [runningAppIds, activeAppId, layoutKey]);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  useEffect(() => {
+    const open = () => setNotificationsOpen(true);
+    window.addEventListener('elyx:open-notifications', open);
+    return () => window.removeEventListener('elyx:open-notifications', open);
+  }, []);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isQuickSettingsOpen, setIsQuickSettingsOpen] = useState(false);
   const [isSwitcherOpen, setIsSwitcherOpen] = useState(false);
@@ -64,16 +107,19 @@ export function MobileShell({
 
   // Wallpaper CSS
   const activeWallpaper =
-    WALLPAPER_PRESETS.find((wp) => wp.id === settings.wallpaperId) || WALLPAPER_PRESETS[0];
+    WALLPAPER_PRESETS.find((wp) => wp.id === settings.wallpaperId) ||
+    WALLPAPER_PRESETS[0];
 
   // Theme Toggles
   const handleToggleTheme = useCallback(() => {
     setMobileTheme((prev) => {
-      const next = prev === MOBILE_THEMES.IOS ? MOBILE_THEMES.ANDROID : MOBILE_THEMES.IOS;
+      const next =
+        prev === MOBILE_THEMES.IOS ? MOBILE_THEMES.ANDROID : MOBILE_THEMES.IOS;
       saveMobileTheme(next);
+      updateSettings({ mobileMode: next });
       return next;
     });
-  }, []);
+  }, [updateSettings]);
 
   const handleToggleNavStyle = useCallback(() => {
     setNavStyle((prev) => {
@@ -87,13 +133,25 @@ export function MobileShell({
   }, []);
 
   // Open Application Fullscreen
-  const handleOpenApp = useCallback((appId) => {
-    setActiveAppId(appId);
-    setRunningAppIds((prev) => (prev.includes(appId) ? prev : [...prev, appId]));
-    setIsDrawerOpen(false);
-    setIsSwitcherOpen(false);
-    setIsQuickSettingsOpen(false);
-  }, []);
+  const handleOpenApp = useCallback(
+    (appId) => {
+      if (!canUserLaunchApp(appId, access.role)) return;
+      setActiveAppId(appId);
+      setRunningAppIds((prev) =>
+        prev.includes(appId) ? prev : [...prev, appId],
+      );
+      setIsDrawerOpen(false);
+      setIsSwitcherOpen(false);
+      setIsQuickSettingsOpen(false);
+    },
+    [access.role],
+  );
+
+  useEffect(() => {
+    const open = () => handleOpenApp('settings');
+    window.addEventListener('elyx:open-settings', open);
+    return () => window.removeEventListener('elyx:open-settings', open);
+  }, [handleOpenApp]);
 
   // Back Navigation
   const handleBack = useCallback(() => {
@@ -124,7 +182,7 @@ export function MobileShell({
         setActiveAppId(null);
       }
     },
-    [activeAppId]
+    [activeAppId],
   );
 
   const handleCloseAllApps = useCallback(() => {
@@ -136,13 +194,24 @@ export function MobileShell({
   // Hardware Back Button (Android / Browser popstate integration)
   useEffect(() => {
     const handlePopState = () => {
-      if (activeAppId || isDrawerOpen || isQuickSettingsOpen || isSwitcherOpen) {
+      if (
+        activeAppId ||
+        isDrawerOpen ||
+        isQuickSettingsOpen ||
+        isSwitcherOpen
+      ) {
         handleBack();
       }
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [activeAppId, isDrawerOpen, isQuickSettingsOpen, isSwitcherOpen, handleBack]);
+  }, [
+    activeAppId,
+    isDrawerOpen,
+    isQuickSettingsOpen,
+    isSwitcherOpen,
+    handleBack,
+  ]);
 
   // Touch Swipe Handling for Top / Bottom Gestures
   const handleTouchStart = (e) => {
@@ -153,14 +222,20 @@ export function MobileShell({
   const handleTouchEnd = (e) => {
     if (touchStartYRef.current === null) return;
     const deltaY = touchStartYRef.current - e.changedTouches[0].clientY;
-    const deltaX = Math.abs(touchStartXRef.current - e.changedTouches[0].clientX);
+    const deltaX = Math.abs(
+      touchStartXRef.current - e.changedTouches[0].clientX,
+    );
 
     // Vertical swipe check (avoid horizontal gestures)
     if (Math.abs(deltaY) > 50 && deltaX < 80) {
       if (deltaY < -60 && touchStartYRef.current < 90) {
         // Swiped down from near top: Open Quick Settings shade
         setIsQuickSettingsOpen(true);
-      } else if (deltaY > 60 && !activeAppId && mobileTheme === MOBILE_THEMES.ANDROID) {
+      } else if (
+        deltaY > 60 &&
+        !activeAppId &&
+        mobileTheme === MOBILE_THEMES.ANDROID
+      ) {
         // Swiped up on Android Home Screen: Open App Drawer
         setIsDrawerOpen(true);
       }
@@ -179,10 +254,34 @@ export function MobileShell({
         '--safe-area-bottom': 'env(safe-area-inset-bottom, 0px)',
       }}
     >
+      {systemNotice && (
+        <div
+          role="status"
+          style={{
+            position: 'fixed',
+            top: 48,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 2000,
+            background: 'var(--elyx-surface-window-body)',
+            color: 'var(--elyx-text-primary)',
+            padding: '10px 16px',
+            borderRadius: 12,
+            maxWidth: '90vw',
+          }}
+        >
+          {systemNotice}
+        </div>
+      )}
       {/* Background Wallpaper */}
       <div
         className={styles.mobileWallpaper}
-        style={{ background: activeWallpaper.darkCss }}
+        style={{
+          background:
+            colorTheme === 'light'
+              ? activeWallpaper.lightCss
+              : activeWallpaper.darkCss,
+        }}
       />
 
       {/* Top Mobile Status Bar */}
@@ -276,6 +375,10 @@ export function MobileShell({
         user={user}
       />
 
+      <NotificationsFlyout
+        isOpen={notificationsOpen}
+        onClose={() => setNotificationsOpen(false)}
+      />
       {/* Multitasking Card Deck App Switcher */}
       <MobileAppSwitcher
         isOpen={isSwitcherOpen}

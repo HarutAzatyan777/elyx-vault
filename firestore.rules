@@ -1,380 +1,100 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    function signedIn() {
-      return request.auth != null;
-    }
-
-    function accessPath() {
-      return /databases/$(database)/documents/userAccess/$(request.auth.uid);
-    }
-
+    function signedIn() { return request.auth != null; }
+    function accessPath() { return /databases/$(database)/documents/userAccess/$(request.auth.uid); }
     function hasAccess() {
-      return signedIn() && exists(accessPath());
+      return signedIn() && exists(accessPath()) && get(accessPath()).data.status == 'active'
+        && get(accessPath()).data.role in ['owner', 'manager', 'member', 'viewer']
+        && get(accessPath()).data.businessId is string && get(accessPath()).data.businessId.size() > 0;
     }
-
-    function access() {
-      return get(accessPath()).data;
+    function access() { return get(accessPath()).data; }
+    function member(businessId) { return hasAccess() && access().businessId == businessId; }
+    function admin(businessId) { return member(businessId) && access().role in ['owner', 'manager']; }
+    function canGrant(role, businessId) { return admin(businessId) && role in ['owner', 'manager', 'member', 'viewer'] && (role != 'owner' || access().role == 'owner'); }
+    function canEdit(businessId) { return member(businessId) && access().role in ['owner', 'manager', 'member']; }
+    function email() { return signedIn() && request.auth.token.email is string ? request.auth.token.email.lower() : ''; }
+    function verified() { return signedIn() && request.auth.token.email_verified == true && email() != ''; }
+    function own(data) { return hasAccess() && data.uid == request.auth.uid; }
+    function invitationPath() { return /databases/$(database)/documents/invitations/$(email()); }
+    function claimedInvitation(data) {
+      return verified() && exists(invitationPath())
+        && get(invitationPath()).data.status in ['pending', 'approved']
+        && get(invitationPath()).data.email.lower() == email()
+        && data.email == email() && data.status == 'active'
+        && data.role in ['owner', 'manager', 'member', 'viewer']
+        && data.role == get(invitationPath()).data.role
+        && data.businessId == get(invitationPath()).data.businessId
+        && getAfter(invitationPath()).data.status == 'accepted'
+        && getAfter(invitationPath()).data.acceptedBy == request.auth.uid;
     }
-
-    function isOwner() {
-      return signedIn() && (
-        (hasAccess() && access().role == 'owner')
-        || (request.auth.token.email is string && request.auth.token.email.lower().matches('.*developerhar.*'))
-      );
-    }
-
-    function isManager() {
-      return signedIn() && (
-        (hasAccess() && access().role in ['owner', 'manager'])
-        || isOwner()
-      );
-    }
-
-    function isBusinessMember(businessId) {
-      return hasAccess() && access().businessId == businessId;
-    }
-
-    function canEditBusiness(businessId) {
-      return isBusinessMember(businessId)
-        && (access().role in ['owner', 'manager', 'member'] || isOwner());
-    }
-
-    function authEmail() {
-      return (signedIn() && request.auth.token.email is string)
-        ? request.auth.token.email.lower()
-        : '';
-    }
-
-    function verifiedEmail() {
-      return signedIn()
-        && request.auth.token.email is string
-        && (
-          request.auth.token.email_verified == true
-          || request.auth.token.firebase.sign_in_provider == 'password'
-          || request.auth.token.firebase.sign_in_provider == 'google.com'
-        );
-    }
-
-    function isInvitationForUser(docId, docData) {
-      return authEmail() != '' && (
-        docId.lower() == authEmail()
-        || (docData != null && docData.email is string && docData.email.lower() == authEmail())
-      );
-    }
-
-    /*
-     * BUSINESSES
-     */
-
-    match /businesses/{businessId} {
-      allow read: if isBusinessMember(businessId);
-      allow write: if false;
-    }
-
-    /*
-     * USER ACCESS
-     */
-
+    match /businesses/{id} { allow read: if member(id); allow write: if false; }
     match /userAccess/{uid} {
-      allow read, get: if signedIn() && (
-        uid == request.auth.uid
-        || isManager()
-      );
-
-      allow list: if isManager();
-
+      allow get: if signedIn() && (uid == request.auth.uid || admin(resource.data.businessId));
+      allow list: if admin(resource.data.businessId);
       allow create: if signedIn() && (
-        // Managers can provision users (only Owner can grant 'owner' role)
-        (isManager() && (request.resource.data.role != 'owner' || isOwner()))
-        // DeveloperHar bootstrap
-        || (uid == request.auth.uid && authEmail().matches('.*developerhar.*') && request.resource.data.role == 'owner')
-        // Invited user claiming their own invitation
-        || (
-          uid == request.auth.uid
-          && authEmail() != ''
-          && request.resource.data.email is string
-          && request.resource.data.email.lower() == authEmail()
-          && exists(/databases/$(database)/documents/invitations/$(authEmail()))
-          && get(/databases/$(database)/documents/invitations/$(authEmail())).data.role == request.resource.data.role
-          && (
-            !('businessId' in get(/databases/$(database)/documents/invitations/$(authEmail())).data)
-            || get(/databases/$(database)/documents/invitations/$(authEmail())).data.businessId == request.resource.data.businessId
-          )
-        )
+        (canGrant(request.resource.data.role, request.resource.data.businessId) && request.resource.data.status in ['active', 'pending'])
+        || (uid == request.auth.uid && claimedInvitation(request.resource.data))
       );
-
-      allow update: if signedIn() && (
-        // Owner can update any user's role
-        isOwner()
-        // Manager can update member/viewer/manager roles, but cannot touch owner
-        || (isManager() && request.resource.data.role != 'owner' && resource.data.role != 'owner')
-        // Normal user can only update their profile metadata, never role/businessId/email
-        || (
-          uid == request.auth.uid
-          && request.resource.data.role == resource.data.role
-          && request.resource.data.businessId == resource.data.businessId
-          && request.resource.data.email == resource.data.email
-        )
-      );
-
-      allow delete: if signedIn() && (
-        isOwner()
-        || (isManager() && resource.data.role != 'owner')
+      allow update: if hasAccess() && request.resource.data.businessId == resource.data.businessId
+        && request.resource.data.email == resource.data.email && (
+          (canGrant(request.resource.data.role, resource.data.businessId)
+            && (resource.data.role != 'owner' || access().role == 'owner')
+            && request.resource.data.status in ['active', 'pending', 'disabled', 'revoked'])
+          || (uid == request.auth.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'updatedAt']))
+        );
+      allow delete: if admin(resource.data.businessId) && (resource.data.role != 'owner' || access().role == 'owner');
+    }
+    match /invitations/{id} {
+      allow read: if admin(resource.data.businessId) || (verified() && resource.data.email.lower() == email());
+      allow create: if canGrant(request.resource.data.role, request.resource.data.businessId)
+        && request.resource.data.status in ['pending', 'approved'] && request.resource.data.email == id;
+      allow delete: if admin(resource.data.businessId) && (resource.data.role != 'owner' || access().role == 'owner');
+      allow update: if (
+        canGrant(request.resource.data.role, resource.data.businessId)
+        && (resource.data.role != 'owner' || access().role == 'owner')
+        && request.resource.data.businessId == resource.data.businessId
+        && request.resource.data.email == resource.data.email
+      ) || (
+        verified() && id == email() && resource.data.email.lower() == email()
+        && resource.data.status in ['pending', 'approved'] && request.resource.data.status == 'accepted'
+        && request.resource.data.acceptedBy == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'acceptedBy', 'acceptedAt'])
+        && getAfter(accessPath()).data.role == resource.data.role
+        && getAfter(accessPath()).data.businessId == resource.data.businessId
+        && getAfter(accessPath()).data.status == 'active'
       );
     }
-
-    /*
-     * INVITATIONS
-     */
-
-    match /invitations/{email} {
-      allow read, get: if signedIn() && (
-        isManager()
-        || isInvitationForUser(email, resource.data)
-      );
-
-      allow list: if isManager() || (signedIn() && authEmail() != '');
-
-      // Only Managers and Owners can create invitations (Managers cannot invite an 'owner')
-      allow create: if signedIn() && (
-        isOwner()
-        || (isManager() && request.resource.data.role != 'owner')
-      );
-
-      // Only Managers and Owners can delete/cancel invitations
-      allow delete: if signedIn() && (
-        isOwner()
-        || (isManager() && resource.data.role != 'owner')
-      );
-
-      // Managers can update invitations.
-      // An invited user may ONLY accept their pending invitation without altering role/businessId/email.
-      allow update: if signedIn() && (
-        isOwner()
-        || (isManager() && request.resource.data.role != 'owner' && resource.data.role != 'owner')
-        || (
-          isInvitationForUser(email, resource.data)
-          && request.resource.data.role == resource.data.role
-          && request.resource.data.email == resource.data.email
-          && (
-            !('businessId' in resource.data)
-            || request.resource.data.businessId == resource.data.businessId
-          )
-          && request.resource.data.status in ['accepted', 'pending']
-        )
-      );
+    match /{collection}/{id} {
+      allow read: if collection in ['projects', 'minecraft_vault'] && member(resource.data.businessId);
+      allow create: if collection in ['projects', 'minecraft_vault'] && canEdit(request.resource.data.businessId) && request.resource.data.createdBy == request.auth.uid;
+      allow update: if collection in ['projects', 'minecraft_vault'] && canEdit(resource.data.businessId)
+        && request.resource.data.businessId == resource.data.businessId && request.resource.data.createdBy == resource.data.createdBy;
+      allow delete: if collection in ['projects', 'minecraft_vault'] && canEdit(resource.data.businessId);
+      allow read: if collection in ['workspace_presets', 'workspace_links', 'workspace_sessions', 'workspace_activity', 'devices', 'terminal_sessions', 'music_vault', 'music_folders', 'media_vault', 'user_notes'] && own(resource.data);
+      allow create: if collection in ['workspace_presets', 'workspace_links', 'workspace_sessions', 'workspace_activity', 'music_vault', 'music_folders', 'media_vault', 'user_notes'] && own(request.resource.data);
+      allow delete: if collection in ['workspace_presets', 'workspace_links', 'workspace_sessions', 'workspace_activity', 'music_vault', 'music_folders', 'media_vault', 'user_notes'] && own(resource.data);
+      allow update: if collection in ['workspace_presets', 'workspace_links', 'workspace_sessions', 'workspace_activity', 'music_vault', 'music_folders', 'media_vault', 'user_notes']
+        && own(resource.data) && request.resource.data.uid == resource.data.uid
+        && request.resource.data.get('businessId', null) == resource.data.get('businessId', null);
     }
-
-    /*
-     * WEB PROJECTS
-     */
-
-    match /projects/{projectId} {
-
-      allow read: if isBusinessMember(
-        resource.data.businessId
-      );
-
-      allow create: if canEditBusiness(
-        request.resource.data.businessId
-      )
-      && request.resource.data.createdBy == request.auth.uid;
-
-      allow update: if canEditBusiness(
-        resource.data.businessId
-      )
-      && request.resource.data.businessId
-        == resource.data.businessId;
-
-      allow delete: if canEditBusiness(
-        resource.data.businessId
-      );
+    match /devices/{id} {
+      allow create: if own(request.resource.data) && access().role in ['owner', 'manager', 'member'];
+      allow update: if own(resource.data) && access().role in ['owner', 'manager', 'member']
+        && request.resource.data.uid == resource.data.uid;
+      allow delete: if own(resource.data) && access().role in ['owner', 'manager', 'member'];
     }
-
-    /*
-     * MINECRAFT VAULT
-     *
-     * Minecraft records now follow the same
-     * business isolation as normal projects.
-     */
-
-    match /minecraft_vault/{docId} {
-
-      allow read: if isBusinessMember(
-        resource.data.businessId
-      );
-
-      allow create: if canEditBusiness(
-        request.resource.data.businessId
-      )
-      && request.resource.data.createdBy == request.auth.uid;
-
-      allow update: if canEditBusiness(
-        resource.data.businessId
-      )
-      && request.resource.data.businessId
-        == resource.data.businessId;
-
-      allow delete: if canEditBusiness(
-        resource.data.businessId
-      );
+    match /terminal_sessions/{id} {
+      allow create: if own(request.resource.data) && access().role in ['owner', 'manager'];
+      allow update: if own(resource.data) && access().role in ['owner', 'manager']
+        && request.resource.data.uid == resource.data.uid;
+      allow delete: if own(resource.data) && access().role in ['owner', 'manager'];
     }
-
-    /*
-     * DAILY WORKSPACE PRESETS
-     */
-    match /workspace_presets/{presetId} {
-      allow read, write: if signedIn() && (
-        resource == null
-          ? request.resource.data.uid == request.auth.uid
-          : resource.data.uid == request.auth.uid
-      );
+    match /security_events/{id} {
+      allow read: if own(resource.data);
+      allow create: if own(request.resource.data);
+      allow update, delete: if false;
     }
-
-    /*
-     * DAILY WORKSPACE LINKS
-     */
-    match /workspace_links/{linkId} {
-      allow read, write: if signedIn() && (
-        resource == null
-          ? request.resource.data.uid == request.auth.uid
-          : resource.data.uid == request.auth.uid
-      );
-    }
-
-    /*
-     * DAILY WORKSPACE SESSIONS
-     */
-    match /workspace_sessions/{sessionId} {
-      allow read, write: if signedIn() && (
-        resource == null
-          ? request.resource.data.uid == request.auth.uid
-          : resource.data.uid == request.auth.uid
-      );
-    }
-
-    /*
-     * DAILY WORKSPACE ACTIVITY
-     */
-    match /workspace_activity/{activityId} {
-      allow read, write: if signedIn() && (
-        resource == null
-          ? request.resource.data.uid == request.auth.uid
-          : resource.data.uid == request.auth.uid
-      );
-    }
-
-    /*
-     * REMOTE DEVICES
-     */
-    match /devices/{deviceId} {
-      allow read, write: if signedIn() && (
-        resource == null
-          ? request.resource.data.uid == request.auth.uid
-          : resource.data.uid == request.auth.uid
-      );
-    }
-
-    /*
-     * TERMINAL SESSIONS
-     */
-    match /terminal_sessions/{sessionId} {
-      allow read, write: if signedIn() && (
-        resource == null
-          ? request.resource.data.uid == request.auth.uid
-          : resource.data.uid == request.auth.uid
-      );
-    }
-
-    /*
-     * SECURITY AUDIT EVENTS
-     */
-    match /security_events/{eventId} {
-      allow read, create: if signedIn() && (
-        resource == null
-          ? request.resource.data.uid == request.auth.uid
-          : resource.data.uid == request.auth.uid
-      );
-      allow update, delete: if false; // Security events cannot be forged or deleted by clients
-    }
-
-    /*
-     * MUSIC VAULT
-     */
-    match /music_vault/{trackId} {
-      allow read: if signedIn() && (
-        resource == null
-        || resource.data.uid == request.auth.uid
-        || isOwner()
-        || (resource.data.businessId != null && isBusinessMember(resource.data.businessId))
-      );
-      allow write: if signedIn() && (
-        resource == null
-          ? (request.resource.data.uid == request.auth.uid || isOwner())
-          : (resource.data.uid == request.auth.uid || isOwner())
-      );
-    }
-
-    /*
-     * MUSIC FOLDERS
-     */
-    match /music_folders/{folderId} {
-      allow read: if signedIn() && (
-        resource == null
-        || resource.data.uid == request.auth.uid
-        || isOwner()
-        || (resource.data.businessId != null && isBusinessMember(resource.data.businessId))
-      );
-      allow write: if signedIn() && (
-        resource == null
-          ? (request.resource.data.uid == request.auth.uid || isOwner())
-          : (resource.data.uid == request.auth.uid || isOwner())
-      );
-    }
-
-    /*
-     * MEDIA VAULT
-     */
-    match /media_vault/{mediaId} {
-      allow read: if signedIn() && (
-        resource == null
-        || resource.data.uid == request.auth.uid
-        || isOwner()
-        || (resource.data.businessId != null && isBusinessMember(resource.data.businessId))
-      );
-      allow write: if signedIn() && (
-        resource == null
-          ? (request.resource.data.uid == request.auth.uid || isOwner())
-          : (resource.data.uid == request.auth.uid || isOwner())
-      );
-    }
-
-    /*
-     * USER NOTES
-     */
-    match /user_notes/{noteId} {
-      allow read: if signedIn() && (
-        resource == null
-        || resource.data.uid == request.auth.uid
-        || isOwner()
-        || (resource.data.businessId != null && isBusinessMember(resource.data.businessId))
-      );
-      allow write: if signedIn() && (
-        resource == null
-          ? (request.resource.data.uid == request.auth.uid || isOwner())
-          : (resource.data.uid == request.auth.uid || isOwner())
-      );
-    }
-
-    /*
-     * DENY EVERYTHING ELSE
-     */
-
-    match /{document=**} {
-      allow read, write: if false;
-    }
+    match /{document=**} { allow read, write: if false; }
   }
 }

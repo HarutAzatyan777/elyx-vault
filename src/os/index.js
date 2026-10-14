@@ -1,3 +1,4 @@
+import { lazy } from 'react';
 /**
  * Elyx OS 1.0 — Public Architecture Entrypoint
  */
@@ -31,22 +32,24 @@ export * from './desktop/types.js';
 export * from './mobile/types.js';
 export * from './workspaces/types.js';
 export * from './notifications/types.js';
+
+
 export * from './shell/index.js';
 
 // Shell & Desktop Components
-export { DesktopShell } from './shell/DesktopShell.jsx';
-export { TopBar } from './shell/TopBar.jsx';
-export { DesktopCanvas } from './desktop/DesktopCanvas.jsx';
-export { DesktopIcon } from './desktop/DesktopIcon.jsx';
-export { DesktopWidgets } from './desktop/DesktopWidgets.jsx';
-export { AppStageAdapter } from './desktop/AppStageAdapter.jsx';
-export { WindowFrame } from './windows/WindowFrame.jsx';
-export { WindowManagerStage } from './windows/WindowManagerStage.jsx';
-export { Dock } from './dock/Dock.jsx';
-export { AppLauncher } from './launcher/AppLauncher.jsx';
-export { CommandPalette } from './launcher/CommandPalette.jsx';
-export { FileManager } from './files/FileManager.jsx';
-export { SystemSettingsApp } from './settings/SystemSettingsApp.jsx';
-export { ExtensionToolsApp } from './settings/ExtensionToolsApp.jsx';
-export { MobileShell } from './mobile/MobileShell.jsx';
+export const DesktopShell = lazy(() => import('./shell/DesktopShell.jsx'));
+export const TopBar = lazy(() => import('./shell/TopBar.jsx'));
+export const DesktopCanvas = lazy(() => import('./desktop/DesktopCanvas.jsx'));
+export const DesktopIcon = lazy(() => import('./desktop/DesktopIcon.jsx'));
+export const DesktopWidgets = lazy(() => import('./desktop/DesktopWidgets.jsx'));
+export const AppStageAdapter = lazy(() => import('./desktop/AppStageAdapter.jsx'));
+export const WindowFrame = lazy(() => import('./windows/WindowFrame.jsx'));
+export const WindowManagerStage = lazy(() => import('./windows/WindowManagerStage.jsx'));
+export const Dock = lazy(() => import('./dock/Dock.jsx'));
+export const AppLauncher = lazy(() => import('./launcher/AppLauncher.jsx'));
+export const CommandPalette = lazy(() => import('./launcher/CommandPalette.jsx'));
+export const FileManager = lazy(() => import('./files/FileManager.jsx'));
+export const SystemSettingsApp = lazy(() => import('./settings/SystemSettingsApp.jsx'));
+export const ExtensionToolsApp = lazy(() => import('./settings/ExtensionToolsApp.jsx'));
+export const MobileShell = lazy(() => import('./mobile/MobileShell.jsx'));
 

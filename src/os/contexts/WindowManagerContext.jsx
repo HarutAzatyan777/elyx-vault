@@ -1,4 +1,14 @@
-import React, { createContext, useCallback, useEffect, useMemo, useState } from 'react';
+import { useAuth } from '../../hooks/useAuth.jsx';
+import { isActiveAccess } from '../../utils/access.js';
+import { canUserLaunchApp } from '../registry/appRegistry.js';
+import React, {
+  createContext,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { getAppById } from '../registry/appRegistry.js';
 import {
   calculateCenteredWindowBounds,
@@ -16,14 +26,20 @@ import {
 export const WindowManagerContext = createContext(null);
 
 export const WindowManagerProvider = ({ children }) => {
+  const { user, access } = useAuth();
   // Initialize windows from saved layout if available
   const [windows, setWindows] = useState(() => {
-    const saved = loadSavedWindowLayout();
+    const saved = loadSavedWindowLayout(user?.uid);
     if (saved && saved.length > 0) {
       return saved
         .map((s, idx) => {
           const app = getAppById(s.appId);
-          if (!app) return null;
+          if (
+            !app ||
+            !isActiveAccess(access) ||
+            !canUserLaunchApp(app, access.role)
+          )
+            return null;
           return {
             id: s.id,
             appId: s.appId,
@@ -35,8 +51,8 @@ export const WindowManagerProvider = ({ children }) => {
               s.snapPosition !== SNAP_POSITIONS.NONE
                 ? WINDOW_STATES.SNAPPED
                 : s.isMaximized
-                ? WINDOW_STATES.MAXIMIZED
-                : WINDOW_STATES.NORMAL,
+                  ? WINDOW_STATES.MAXIMIZED
+                  : WINDOW_STATES.NORMAL,
             snapPosition: s.snapPosition || SNAP_POSITIONS.NONE,
             isFocused: idx === saved.length - 1,
             isMinimized: Boolean(s.isMinimized),
@@ -61,10 +77,10 @@ export const WindowManagerProvider = ({ children }) => {
   // Safely persist window layout changes
   useEffect(() => {
     const timer = setTimeout(() => {
-      saveWindowLayout(windows);
+      saveWindowLayout(windows, user?.uid);
     }, 200);
     return () => clearTimeout(timer);
-  }, [windows]);
+  }, [windows, user?.uid]);
 
   // Automatically adapt windows when browser viewport changes
   useEffect(() => {
@@ -88,7 +104,7 @@ export const WindowManagerProvider = ({ children }) => {
             ...win,
             bounds: constrainWindowBounds(win.bounds, viewport, win.minSize),
           };
-        })
+        }),
       );
     };
 
@@ -114,19 +130,26 @@ export const WindowManagerProvider = ({ children }) => {
             };
           }
           return win.isFocused ? { ...win, isFocused: false } : win;
-        })
+        }),
       );
       return nextZ;
     });
   }, []);
 
+  const currentRef = useRef({ windows, topZIndex, access });
+  currentRef.current = { windows, topZIndex, access };
   /**
    * Opens an application window, or restores & focuses existing if single-instance.
    */
   const openWindow = useCallback(
     (appId, options = {}) => {
+      const { windows, topZIndex, access } = currentRef.current;
       const app = getAppById(appId);
-      if (!app) {
+      if (
+        !app ||
+        !isActiveAccess(access) ||
+        !canUserLaunchApp(app, access.role)
+      ) {
         console.warn(`[WindowManager] Cannot open unknown app: ${appId}`);
         return null;
       }
@@ -141,12 +164,12 @@ export const WindowManagerProvider = ({ children }) => {
         }
       }
 
-      const windowId = options.id || `${appId}_${Date.now()}`;
+      const windowId = `${appId}_${crypto.randomUUID()}`;
       const viewport = { width: window.innerWidth, height: window.innerHeight };
       const defaultBounds = calculateCenteredWindowBounds(
         app.defaultWindowSize,
         viewport,
-        windows.length
+        windows.length,
       );
 
       const newWindow = {
@@ -168,6 +191,11 @@ export const WindowManagerProvider = ({ children }) => {
         customProps: options.customProps || {},
       };
 
+      currentRef.current = {
+        ...currentRef.current,
+        windows: [...windows, newWindow],
+        topZIndex: topZIndex + 1,
+      };
       setTopZIndex((prev) => prev + 1);
       setActiveWindowId(windowId);
       setWindows((prev) => [
@@ -177,7 +205,7 @@ export const WindowManagerProvider = ({ children }) => {
 
       return windowId;
     },
-    [windows, topZIndex, focusWindow]
+    [focusWindow],
   );
 
   /**
@@ -190,11 +218,13 @@ export const WindowManagerProvider = ({ children }) => {
         const visibleRemaining = remaining.filter((w) => !w.isMinimized);
         if (visibleRemaining.length > 0) {
           const nextActive = visibleRemaining.reduce((highest, current) =>
-            current.zIndex > highest.zIndex ? current : highest
+            current.zIndex > highest.zIndex ? current : highest,
           );
           setActiveWindowId(nextActive.id);
           return remaining.map((w) =>
-            w.id === nextActive.id ? { ...w, isFocused: true } : { ...w, isFocused: false }
+            w.id === nextActive.id
+              ? { ...w, isFocused: true }
+              : { ...w, isFocused: false },
           );
         }
       }
@@ -210,18 +240,23 @@ export const WindowManagerProvider = ({ children }) => {
     setWindows((prev) => {
       const updated = prev.map((w) =>
         w.id === windowId
-          ? { ...w, isMinimized: true, isFocused: false, state: WINDOW_STATES.MINIMIZED }
-          : w
+          ? {
+              ...w,
+              isMinimized: true,
+              isFocused: false,
+              state: WINDOW_STATES.MINIMIZED,
+            }
+          : w,
       );
 
       const visible = updated.filter((w) => !w.isMinimized);
       if (visible.length > 0) {
         const nextActive = visible.reduce((highest, current) =>
-          current.zIndex > highest.zIndex ? current : highest
+          current.zIndex > highest.zIndex ? current : highest,
         );
         setActiveWindowId(nextActive.id);
         return updated.map((w) =>
-          w.id === nextActive.id ? { ...w, isFocused: true } : w
+          w.id === nextActive.id ? { ...w, isFocused: true } : w,
         );
       } else {
         setActiveWindowId(null);
@@ -242,7 +277,8 @@ export const WindowManagerProvider = ({ children }) => {
       setWindows((prev) =>
         prev.map((w) => {
           if (w.id === windowId) {
-            const isFloating = w.snapPosition === SNAP_POSITIONS.NONE && !w.isMaximized;
+            const isFloating =
+              w.snapPosition === SNAP_POSITIONS.NONE && !w.isMaximized;
             return {
               ...w,
               snapPosition,
@@ -256,29 +292,17 @@ export const WindowManagerProvider = ({ children }) => {
             };
           }
           return w;
-        })
+        }),
       );
 
       focusWindow(windowId);
     },
-    [focusWindow]
+    [focusWindow],
   );
 
   /**
    * Toggles maximization of a window between full work area and previous dimensions.
    */
-  const maximizeWindow = useCallback(
-    (windowId) => {
-      const target = windows.find((w) => w.id === windowId);
-      if (target?.isMaximized) {
-        restoreWindow(windowId);
-      } else {
-        snapWindow(windowId, SNAP_POSITIONS.MAXIMIZE);
-      }
-    },
-    [windows, snapWindow]
-  );
-
   /**
    * Restores a minimized, maximized, or snapped window back to normal floating state.
    */
@@ -297,12 +321,24 @@ export const WindowManagerProvider = ({ children }) => {
             };
           }
           return w;
-        })
+        }),
       );
 
       focusWindow(windowId);
     },
-    [focusWindow]
+    [focusWindow],
+  );
+
+  const maximizeWindow = useCallback(
+    (windowId) => {
+      const target = windows.find((w) => w.id === windowId);
+      if (target?.isMaximized) {
+        restoreWindow(windowId);
+      } else {
+        snapWindow(windowId, SNAP_POSITIONS.MAXIMIZE);
+      }
+    },
+    [windows, snapWindow, restoreWindow],
   );
 
   /**
@@ -317,7 +353,7 @@ export const WindowManagerProvider = ({ children }) => {
           const constrained = constrainWindowBounds(
             { ...w.bounds, ...rawBounds },
             viewport,
-            w.minSize
+            w.minSize,
           );
           return {
             ...w,
@@ -329,7 +365,7 @@ export const WindowManagerProvider = ({ children }) => {
           };
         }
         return w;
-      })
+      }),
     );
   }, []);
 
@@ -338,7 +374,9 @@ export const WindowManagerProvider = ({ children }) => {
    */
   const moveWindowToWorkspace = useCallback((windowId, targetWorkspaceId) => {
     setWindows((prev) =>
-      prev.map((w) => (w.id === windowId ? { ...w, workspaceId: targetWorkspaceId } : w))
+      prev.map((w) =>
+        w.id === windowId ? { ...w, workspaceId: targetWorkspaceId } : w,
+      ),
     );
   }, []);
 
@@ -349,24 +387,24 @@ export const WindowManagerProvider = ({ children }) => {
     (deletedWorkspaceId, fallbackWorkspaceId = 1) => {
       setWindows((prev) =>
         prev.map((w) =>
-          w.workspaceId === deletedWorkspaceId ? { ...w, workspaceId: fallbackWorkspaceId } : w
-        )
+          w.workspaceId === deletedWorkspaceId
+            ? { ...w, workspaceId: fallbackWorkspaceId }
+            : w,
+        ),
       );
     },
-    []
+    [],
   );
 
   const minimizeAllWindows = useCallback(() => {
     setWindows((prev) =>
-      prev.map((w) => ({ ...w, isMinimized: true, isFocused: false }))
+      prev.map((w) => ({ ...w, isMinimized: true, isFocused: false })),
     );
     setActiveWindowId(null);
   }, []);
 
   const restoreAllWindows = useCallback(() => {
-    setWindows((prev) =>
-      prev.map((w) => ({ ...w, isMinimized: false }))
-    );
+    setWindows((prev) => prev.map((w) => ({ ...w, isMinimized: false })));
   }, []);
 
   const closeAllWindows = useCallback(() => {
@@ -376,7 +414,7 @@ export const WindowManagerProvider = ({ children }) => {
 
   const activeWindow = useMemo(
     () => windows.find((w) => w.id === activeWindowId) || null,
-    [windows, activeWindowId]
+    [windows, activeWindowId],
   );
 
   const value = useMemo(
@@ -415,7 +453,7 @@ export const WindowManagerProvider = ({ children }) => {
       minimizeAllWindows,
       restoreAllWindows,
       closeAllWindows,
-    ]
+    ],
   );
 
   return (

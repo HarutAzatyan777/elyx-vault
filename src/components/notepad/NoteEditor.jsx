@@ -1,8 +1,9 @@
+import { encryptRequired } from '../../utils/securePayload.js';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { NotepadToolbar } from './NotepadToolbar';
 import { MarkdownView } from './MarkdownView';
 import { NOTE_CATEGORIES } from './notepadTemplates';
-import { encryptData, decryptData } from '../../utils/crypto';
+import { decryptData } from '../../utils/crypto';
 import {
   downloadNoteFile,
   copyTextToClipboard,
@@ -27,6 +28,9 @@ export const NoteEditor = ({
   const [saveStatus, setSaveStatus] = useState('saved'); // 'saved' | 'saving'
   const [localPassInput, setLocalPassInput] = useState('');
   const [decryptError, setDecryptError] = useState(false);
+  const [encryptionMode, setEncryptionMode] = useState(
+    Boolean(note?.isEncrypted),
+  );
 
   const textareaRef = useRef(null);
   const saveTimeoutRef = useRef(null);
@@ -41,6 +45,7 @@ export const NoteEditor = ({
   useEffect(() => {
     if (!note) return;
 
+    setEncryptionMode(Boolean(note.isEncrypted));
     setTitle(note.title || '');
     setCategory(note.category || 'Ideas');
     setTags(note.tags || []);
@@ -52,7 +57,7 @@ export const NoteEditor = ({
         if (decrypted !== null) {
           setContent(decrypted);
         } else {
-          setContent(note.content || '');
+          setContent('');
           setDecryptError(true);
         }
       } else {
@@ -64,6 +69,12 @@ export const NoteEditor = ({
     }
   }, [note?.id, note?.isEncrypted, masterPassword]);
 
+  useEffect(() => {
+    return () => {
+      clearTimeout(saveTimeoutRef.current);
+    };
+  }, [note?.id, masterPassword]);
+
   // Handle local unlock submission
   const handleLocalUnlock = (e) => {
     e.preventDefault();
@@ -73,34 +84,53 @@ export const NoteEditor = ({
   };
 
   // Trigger debounced save
-  const triggerAutoSave = (newTitle, newContent, newCategory, newTags, newEncrypted, newPinned) => {
+  const triggerAutoSave = (
+    newTitle,
+    newContent,
+    newCategory,
+    newTags,
+    newEncrypted,
+    newPinned,
+  ) => {
+    if (isLocked || decryptError) {
+      setSaveStatus('error');
+      return;
+    }
     setSaveStatus('saving');
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
 
-    saveTimeoutRef.current = setTimeout(() => {
+    saveTimeoutRef.current = setTimeout(async () => {
       let finalContent = newContent;
-      const isEnc = newEncrypted !== undefined ? newEncrypted : note?.isEncrypted;
+      const isEnc = newEncrypted !== undefined ? newEncrypted : encryptionMode;
 
-      if (isEnc && masterPassword) {
-        const encrypted = encryptData(newContent, masterPassword);
-        if (encrypted) {
-          finalContent = encrypted;
+      if (isEnc) {
+        try {
+          finalContent = encryptRequired(newContent, masterPassword);
+        } catch {
+          setSaveStatus('error');
+          return;
         }
       }
 
-      onUpdateNote({
-        id: note.id,
-        title: newTitle,
-        content: finalContent,
-        category: newCategory,
-        tags: newTags,
-        isEncrypted: Boolean(isEnc),
-        isPinned: Boolean(newPinned !== undefined ? newPinned : note?.isPinned),
-      });
+      try {
+        await onUpdateNote({
+          id: note.id,
+          title: newTitle,
+          content: finalContent,
+          category: newCategory,
+          tags: newTags,
+          isEncrypted: Boolean(isEnc),
+          isPinned: Boolean(
+            newPinned !== undefined ? newPinned : note?.isPinned,
+          ),
+        });
 
-      setSaveStatus('saved');
+        setSaveStatus('saved');
+      } catch {
+        setSaveStatus('error');
+      }
     }, 450);
   };
 
@@ -108,21 +138,28 @@ export const NoteEditor = ({
   const handleContentChange = (e) => {
     const val = e.target.value;
     setContent(val);
-    triggerAutoSave(title, val, category, tags, note?.isEncrypted, note?.isPinned);
+    triggerAutoSave(title, val, category, tags, encryptionMode, note?.isPinned);
   };
 
   // Title change
   const handleTitleChange = (e) => {
     const val = e.target.value;
     setTitle(val);
-    triggerAutoSave(val, content, category, tags, note?.isEncrypted, note?.isPinned);
+    triggerAutoSave(
+      val,
+      content,
+      category,
+      tags,
+      encryptionMode,
+      note?.isPinned,
+    );
   };
 
   // Category change
   const handleCategoryChange = (e) => {
     const val = e.target.value;
     setCategory(val);
-    triggerAutoSave(title, content, val, tags, note?.isEncrypted, note?.isPinned);
+    triggerAutoSave(title, content, val, tags, encryptionMode, note?.isPinned);
   };
 
   // Tag add / remove
@@ -134,7 +171,14 @@ export const NoteEditor = ({
         const nextTags = [...tags, trimmed];
         setTags(nextTags);
         setTagInput('');
-        triggerAutoSave(title, content, category, nextTags, note?.isEncrypted, note?.isPinned);
+        triggerAutoSave(
+          title,
+          content,
+          category,
+          nextTags,
+          encryptionMode,
+          note?.isPinned,
+        );
       }
     }
   };
@@ -142,7 +186,14 @@ export const NoteEditor = ({
   const handleRemoveTag = (tagToRemove) => {
     const nextTags = tags.filter((t) => t !== tagToRemove);
     setTags(nextTags);
-    triggerAutoSave(title, content, category, nextTags, note?.isEncrypted, note?.isPinned);
+    triggerAutoSave(
+      title,
+      content,
+      category,
+      nextTags,
+      encryptionMode,
+      note?.isPinned,
+    );
   };
 
   // Format action on textarea
@@ -216,9 +267,17 @@ export const NoteEditor = ({
         return;
     }
 
-    const nextContent = content.substring(0, start) + replacement + content.substring(end);
+    const nextContent =
+      content.substring(0, start) + replacement + content.substring(end);
     setContent(nextContent);
-    triggerAutoSave(title, nextContent, category, tags, note?.isEncrypted, note?.isPinned);
+    triggerAutoSave(
+      title,
+      nextContent,
+      category,
+      tags,
+      encryptionMode,
+      note?.isPinned,
+    );
 
     setTimeout(() => {
       textarea.focus();
@@ -240,9 +299,17 @@ export const NoteEditor = ({
       if (!textarea) return;
       const start = textarea.selectionStart;
       const end = textarea.selectionEnd;
-      const nextContent = content.substring(0, start) + '  ' + content.substring(end);
+      const nextContent =
+        content.substring(0, start) + '  ' + content.substring(end);
       setContent(nextContent);
-      triggerAutoSave(title, nextContent, category, tags, note?.isEncrypted, note?.isPinned);
+      triggerAutoSave(
+        title,
+        nextContent,
+        category,
+        tags,
+        encryptionMode,
+        note?.isPinned,
+      );
       setTimeout(() => {
         textarea.selectionStart = textarea.selectionEnd = start + 2;
       }, 0);
@@ -270,7 +337,14 @@ export const NoteEditor = ({
 
     const nextContent = updatedLines.join('\n');
     setContent(nextContent);
-    triggerAutoSave(title, nextContent, category, tags, note?.isEncrypted, note?.isPinned);
+    triggerAutoSave(
+      title,
+      nextContent,
+      category,
+      tags,
+      encryptionMode,
+      note?.isPinned,
+    );
   };
 
   // Template insert
@@ -281,17 +355,34 @@ export const NoteEditor = ({
     if (template.category && !category) {
       setCategory(template.category);
     }
-    triggerAutoSave(title, nextContent, category || template.category, tags, note?.isEncrypted, note?.isPinned);
+    triggerAutoSave(
+      title,
+      nextContent,
+      category || template.category,
+      tags,
+      encryptionMode,
+      note?.isPinned,
+    );
   };
 
   // Encryption toggle
   const handleToggleEncrypt = () => {
     if (!masterPassword) {
-      alert('Խնդրում ենք նախ բացել Vault-ը (Unlock Vault) Master Password-ով, որպեսզի գաղտնագրումը հասանելի լինի:');
+      alert(
+        'Խնդրում ենք նախ բացել Vault-ը (Unlock Vault) Master Password-ով, որպեսզի գաղտնագրումը հասանելի լինի:',
+      );
       return;
     }
-    const nextEncrypted = !note?.isEncrypted;
-    triggerAutoSave(title, content, category, tags, nextEncrypted, note?.isPinned);
+    const nextEncrypted = !encryptionMode;
+    setEncryptionMode(nextEncrypted);
+    triggerAutoSave(
+      title,
+      content,
+      category,
+      tags,
+      nextEncrypted,
+      note?.isPinned,
+    );
   };
 
   // Copy content
@@ -332,7 +423,9 @@ export const NoteEditor = ({
   }
 
   return (
-    <div className={`${styles.editorContainer} ${isZenMode ? styles.zenModeActive : ''}`}>
+    <div
+      className={`${styles.editorContainer} ${isZenMode ? styles.zenModeActive : ''}`}
+    >
       {/* Top Toolbar */}
       <NotepadToolbar
         viewMode={viewMode}
@@ -341,7 +434,7 @@ export const NoteEditor = ({
         onToggleZenMode={() => setIsZenMode((prev) => !prev)}
         isPinned={note.isPinned}
         onTogglePin={() => onTogglePin(note.id, !note.isPinned)}
-        isEncrypted={note.isEncrypted}
+        isEncrypted={encryptionMode}
         onToggleEncrypt={handleToggleEncrypt}
         hasMasterPassword={Boolean(masterPassword)}
         onApplyFormat={applyFormatting}
@@ -410,7 +503,7 @@ export const NoteEditor = ({
 
           {note.isEncrypted && (
             <span className={styles.encryptedBannerBadge}>
-              🔒 AES-256 Zero-Knowledge
+              🔒 Content encrypted · Title and tags remain readable
             </span>
           )}
         </div>
@@ -421,9 +514,12 @@ export const NoteEditor = ({
         <div className={styles.lockedContainer}>
           <div className={styles.lockBox}>
             <div className={styles.lockIconBig}>🔒</div>
-            <h2 className={styles.lockedTitle}>Գաղտնագրված Նոթ (Protected Vault)</h2>
+            <h2 className={styles.lockedTitle}>
+              Գաղտնագրված Նոթ (Protected Vault)
+            </h2>
             <p className={styles.lockedText}>
-              Այս նոթը պաշտպանված է Master Password-ով: Բովանդակությունը տեսնելու համար մուտքագրեք Master Password-ը:
+              Այս նոթը պաշտպանված է Master Password-ով: Բովանդակությունը
+              տեսնելու համար մուտքագրեք Master Password-ը:
             </p>
 
             <form onSubmit={handleLocalUnlock} className={styles.unlockForm}>
@@ -443,13 +539,16 @@ export const NoteEditor = ({
         </div>
       ) : decryptError ? (
         <div className={styles.decryptErrorNotice}>
-          ⚠️ Չհաջողվեց վերծանել նոթի բովանդակությունը: Հնարավոր է մուտքագրված Master Password-ը սխալ է:
+          ⚠️ Չհաջողվեց վերծանել նոթի բովանդակությունը: Հնարավոր է մուտքագրված
+          Master Password-ը սխալ է:
         </div>
       ) : (
         <div className={styles.workspaceArea}>
           {/* Editor Pane (Shown in 'edit' or 'split') */}
           {(viewMode === 'edit' || viewMode === 'split') && (
-            <div className={`${styles.editorPane} ${viewMode === 'split' ? styles.paneSplit : ''}`}>
+            <div
+              className={`${styles.editorPane} ${viewMode === 'split' ? styles.paneSplit : ''}`}
+            >
               <textarea
                 ref={textareaRef}
                 className={styles.textarea}
@@ -464,7 +563,9 @@ export const NoteEditor = ({
 
           {/* Preview Pane (Shown in 'preview' or 'split') */}
           {(viewMode === 'preview' || viewMode === 'split') && (
-            <div className={`${styles.previewPane} ${viewMode === 'split' ? styles.paneSplit : ''}`}>
+            <div
+              className={`${styles.previewPane} ${viewMode === 'split' ? styles.paneSplit : ''}`}
+            >
               <MarkdownView
                 content={content}
                 onToggleChecklist={handleToggleChecklist}
@@ -490,15 +591,43 @@ export const NoteEditor = ({
           <div className={styles.saveBadge}>
             <span
               className={`${styles.saveDot} ${
-                saveStatus === 'saving' ? styles.saveDotSaving : styles.saveDotSaved
+                saveStatus === 'saving'
+                  ? styles.saveDotSaving
+                  : styles.saveDotSaved
               }`}
             />
-            <span>{saveStatus === 'saving' ? 'Պահպանվում է...' : 'Պահպանված է'}</span>
+            <span role="status">
+              {saveStatus === 'error'
+                ? 'Saving failed. Reconnect and retry.'
+                : saveStatus === 'saving'
+                  ? 'Պահպանվում է...'
+                  : 'Պահպանված է'}
+            </span>
+            {saveStatus === 'error' && (
+              <button
+                type="button"
+                onClick={() =>
+                  triggerAutoSave(
+                    title,
+                    content,
+                    category,
+                    tags,
+                    encryptionMode,
+                    note?.isPinned,
+                  )
+                }
+              >
+                Retry save
+              </button>
+            )}
           </div>
 
           <span className={styles.lastEdit}>
             {note?.updatedAt
-              ? new Date(note.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              ? new Date(note.updatedAt).toLocaleTimeString([], {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })
               : ''}
           </span>
         </div>

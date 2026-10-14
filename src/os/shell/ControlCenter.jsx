@@ -1,4 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import SystemControls from './SystemControls.jsx';
+import { useFlyoutFocus } from '../hooks/useFlyoutFocus.js';
+import React, { useRef } from 'react';
 import { useTheme } from '../../context/ThemeContext.jsx';
 import styles from './TopBar.module.css';
 
@@ -15,29 +17,11 @@ export function ControlCenter({
   const { theme, toggleTheme } = useTheme();
   const flyoutRef = useRef(null);
 
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handleDown = (e) => {
-      if (flyoutRef.current && !flyoutRef.current.contains(e.target)) {
-        onClose();
-      }
-    };
-    const handleKey = (e) => {
-      if (e.key === 'Escape') onClose();
-    };
-
-    window.addEventListener('mousedown', handleDown);
-    window.addEventListener('keydown', handleKey);
-    return () => {
-      window.removeEventListener('mousedown', handleDown);
-      window.removeEventListener('keydown', handleKey);
-    };
-  }, [isOpen, onClose]);
+  useFlyoutFocus(isOpen, flyoutRef, onClose);
 
   if (!isOpen) return null;
 
-  const email = user?.email || 'user@elyx.local';
+  const email = user?.email || 'Signed out';
   const name = user?.displayName || email.split('@')[0];
   const role = access?.role || 'viewer';
 
@@ -97,6 +81,7 @@ export function ControlCenter({
 
       <div className={styles.dropdownDivider} />
 
+      <SystemControls />
       {/* Bottom Actions */}
       <div className={styles.flyoutActions}>
         <button

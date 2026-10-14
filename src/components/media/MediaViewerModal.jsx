@@ -1,9 +1,11 @@
+import { isLegacyCiphertext } from '../../utils/securePayload.js';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   formatBytes,
   formatDuration,
   downloadMediaFile,
   parseYouTubeVideoId,
+  getMediaBlob,
 } from '../../services/mediaService';
 import { decryptData } from '../../utils/crypto';
 import styles from './MediaViewerModal.module.css';
@@ -28,16 +30,50 @@ export const MediaViewerModal = ({
 
   const videoRef = useRef(null);
 
+  const [localPayload, setLocalPayload] = useState(null);
+  useEffect(() => {
+    let active = true;
+    setLocalPayload(null);
+    let objectUrl;
+    if (
+      isOpen &&
+      item &&
+      ((!item.isEncrypted && !item.storagePath) ||
+        (item._encryptedLocalPayload && masterPassword))
+    )
+      getMediaBlob(item.id).then((value) => {
+        if (!active) return;
+        if (value instanceof Blob) {
+          if (item.isEncrypted) return;
+          objectUrl = URL.createObjectURL(value);
+          setLocalPayload(objectUrl);
+        } else setLocalPayload(value);
+      });
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [
+    isOpen,
+    item?.id,
+    item?._encryptedLocalPayload,
+    item?.isEncrypted,
+    item?.storagePath,
+    masterPassword,
+  ]);
   // Decrypt URL if item is encrypted
   const decryptedUrl = useMemo(() => {
     if (!item) return '';
-    if (!item.isEncrypted) return item.url;
+    if (!item.isEncrypted) return localPayload || item.url;
     if (!masterPassword) return null; // Locked
-    const decrypted = decryptData(item.url, masterPassword);
-    return decrypted || item.url;
-  }, [item, masterPassword]);
+    const decrypted = decryptData(
+      isLegacyCiphertext(localPayload) ? localPayload : item.url,
+      masterPassword,
+    );
+    return decrypted;
+  }, [item, masterPassword, localPayload]);
 
-  const isLocked = item?.isEncrypted && !masterPassword;
+  const isLocked = item?.isEncrypted && !decryptedUrl;
 
   // Keyboard navigation (Escape to close, Left/Right arrows)
   useEffect(() => {
@@ -64,7 +100,7 @@ export const MediaViewerModal = ({
 
   if (!isOpen || !item) return null;
 
-  const ytId = item.youtubeId || parseYouTubeVideoId(decryptedUrl || item.url);
+  const ytId = !isLocked && parseYouTubeVideoId(decryptedUrl || '');
 
   const handleCopyLink = async () => {
     try {
@@ -79,7 +115,9 @@ export const MediaViewerModal = ({
   };
 
   const handleZoom = (delta) => {
-    setZoomLevel((prev) => Math.min(3, Math.max(0.5, +(prev + delta).toFixed(1))));
+    setZoomLevel((prev) =>
+      Math.min(3, Math.max(0.5, +(prev + delta).toFixed(1))),
+    );
   };
 
   const handlePlaybackRateChange = (speed) => {
@@ -99,11 +137,16 @@ export const MediaViewerModal = ({
 
   return (
     <div className={styles.backdrop} onClick={onClose}>
-      <div className={styles.lightboxContainer} onClick={(e) => e.stopPropagation()}>
+      <div
+        className={styles.lightboxContainer}
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Top Control Bar */}
         <div className={styles.topBar}>
           <div className={styles.titleArea}>
-            <span className={styles.typeIcon}>{item.type === 'video' ? '🎥' : '🖼️'}</span>
+            <span className={styles.typeIcon}>
+              {item.type === 'video' ? '🎥' : '🖼️'}
+            </span>
             <div className={styles.titleWrapper}>
               <h3 className={styles.itemTitle}>{item.title}</h3>
               <span className={styles.metaSub}>
@@ -124,7 +167,9 @@ export const MediaViewerModal = ({
                 >
                   −
                 </button>
-                <span className={styles.zoomLabel}>{Math.round(zoomLevel * 100)}%</span>
+                <span className={styles.zoomLabel}>
+                  {Math.round(zoomLevel * 100)}%
+                </span>
                 <button
                   type="button"
                   className={styles.iconBtn}
@@ -178,12 +223,34 @@ export const MediaViewerModal = ({
               title="Copy Media URL"
             >
               {copiedLink ? (
-                <svg fill="none" stroke="#10b981" viewBox="0 0 24 24" width="18" height="18">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+                <svg
+                  fill="none"
+                  stroke="#10b981"
+                  viewBox="0 0 24 24"
+                  width="18"
+                  height="18"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2.5"
+                    d="M5 13l4 4L19 7"
+                  />
                 </svg>
               ) : (
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="18" height="18">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                <svg
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  width="18"
+                  height="18"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
+                  />
                 </svg>
               )}
             </button>
@@ -193,11 +260,24 @@ export const MediaViewerModal = ({
               <button
                 type="button"
                 className={styles.iconBtn}
-                onClick={() => downloadMediaFile({ ...item, url: decryptedUrl })}
+                onClick={() =>
+                  downloadMediaFile({ ...item, url: decryptedUrl })
+                }
                 title="Download file"
               >
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="18" height="18">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                <svg
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  width="18"
+                  height="18"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                  />
                 </svg>
               </button>
             )}
@@ -217,20 +297,40 @@ export const MediaViewerModal = ({
               type="button"
               className={`${styles.iconBtn} ${styles.iconBtnDelete}`}
               onClick={() => {
-                if (window.confirm(`Վստա՞հ եք, որ ցանկանում եք ջնջել «${item.title}»-ը:`)) {
+                if (
+                  window.confirm(
+                    `Վստա՞հ եք, որ ցանկանում եք ջնջել «${item.title}»-ը:`,
+                  )
+                ) {
                   onDelete(item.id);
                   onClose();
                 }
               }}
               title="Delete item"
             >
-              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="18" height="18">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              <svg
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                width="18"
+                height="18"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                />
               </svg>
             </button>
 
             {/* Close */}
-            <button type="button" className={styles.closeBtn} onClick={onClose} title="Close (Esc)">
+            <button
+              type="button"
+              className={styles.closeBtn}
+              onClick={onClose}
+              title="Close (Esc)"
+            >
               ×
             </button>
           </div>
@@ -256,11 +356,17 @@ export const MediaViewerModal = ({
               <div className={styles.lockedContainer}>
                 <div className={styles.lockBox}>
                   <div className={styles.lockIconBig}>🔒</div>
-                  <h3 className={styles.lockedTitle}>Գաղտնագրված Մեդիա (Vault Protected)</h3>
+                  <h3 className={styles.lockedTitle}>
+                    Գաղտնագրված Մեդիա (Vault Protected)
+                  </h3>
                   <p className={styles.lockedText}>
-                    Այս մեդիա ֆայլը պաշտպանված է Master Password-ով (Zero-Knowledge): Դիտելու համար մուտքագրեք Master Password-ը:
+                    Այս մեդիա ֆայլը պաշտպանված է Master Password-ով (Client-side
+                    encryption): Դիտելու համար մուտքագրեք Master Password-ը:
                   </p>
-                  <form onSubmit={handleUnlockSubmit} className={styles.unlockForm}>
+                  <form
+                    onSubmit={handleUnlockSubmit}
+                    className={styles.unlockForm}
+                  >
                     <input
                       type="password"
                       className={styles.unlockInput}
@@ -346,19 +452,25 @@ export const MediaViewerModal = ({
                 <div className={styles.infoRow}>
                   <span className={styles.infoLabel}>Տեսակը:</span>
                   <span className={styles.infoValue}>
-                    {item.type === 'video' ? 'Վիդեո (Video)' : 'Լուսանկար (Image)'}
+                    {item.type === 'video'
+                      ? 'Վիդեո (Video)'
+                      : 'Լուսանկար (Image)'}
                   </span>
                 </div>
 
                 <div className={styles.infoRow}>
                   <span className={styles.infoLabel}>Կատեգորիա:</span>
-                  <span className={styles.infoValue}>{item.category || 'General'}</span>
+                  <span className={styles.infoValue}>
+                    {item.category || 'General'}
+                  </span>
                 </div>
 
                 <div className={styles.infoRow}>
                   <span className={styles.infoLabel}>Պահոց:</span>
                   <span className={styles.infoValue}>
-                    {item.storagePath || (typeof item.url === 'string' && item.url.includes('firebasestorage.googleapis.com'))
+                    {item.storagePath ||
+                    (typeof item.url === 'string' &&
+                      item.url.includes('firebasestorage.googleapis.com'))
                       ? '☁️ Firebase Cloud Storage'
                       : '💾 Local / Cache'}
                   </span>
@@ -367,7 +479,9 @@ export const MediaViewerModal = ({
                 {item.fileSize && (
                   <div className={styles.infoRow}>
                     <span className={styles.infoLabel}>Ֆայլի Չափ:</span>
-                    <span className={styles.infoValue}>{formatBytes(item.fileSize)}</span>
+                    <span className={styles.infoValue}>
+                      {formatBytes(item.fileSize)}
+                    </span>
                   </div>
                 )}
 
@@ -381,7 +495,9 @@ export const MediaViewerModal = ({
                 {item.duration && (
                   <div className={styles.infoRow}>
                     <span className={styles.infoLabel}>Տևողություն:</span>
-                    <span className={styles.infoValue}>{formatDuration(item.duration)}</span>
+                    <span className={styles.infoValue}>
+                      {formatDuration(item.duration)}
+                    </span>
                   </div>
                 )}
 
@@ -395,7 +511,9 @@ export const MediaViewerModal = ({
                 <div className={styles.infoRow}>
                   <span className={styles.infoLabel}>Պաշտպանություն:</span>
                   <span className={styles.infoValue}>
-                    {item.isEncrypted ? '🔒 Zero-Knowledge AES-256' : 'Ստանդարտ'}
+                    {item.isEncrypted
+                      ? '🔒 Zero-Knowledge AES-256'
+                      : 'Ստանդարտ'}
                   </span>
                 </div>
 

@@ -54,3 +54,24 @@ export const canAssignRole = (callerRole, targetRole) => {
 export const hasAdminPrivileges = (role) => {
   return role === 'owner' || role === 'manager';
 };
+
+// A role alone is never evidence of authorization.
+export const isActiveAccess = (access) =>
+  Boolean(
+    access &&
+      access.status === 'active' &&
+      ALL_ROLES.includes(access.role) &&
+      typeof access.businessId === 'string' &&
+      access.businessId.trim(),
+  );
+export const canAcceptInvitation = (invitation, user) =>
+  Boolean(
+    user?.uid &&
+      user.emailVerified &&
+      invitation &&
+      ['pending', 'approved'].includes(invitation.status) &&
+      ALL_ROLES.includes(invitation.role) &&
+      typeof invitation.businessId === 'string' &&
+      invitation.businessId.trim() &&
+      normalizeEmail(invitation.email) === normalizeEmail(user.email),
+  );

@@ -1,3 +1,6 @@
+import { pickPersistedFields, MUSIC_FIELDS } from '../utils/persistence.js';
+import { isLegacyCiphertext } from '../utils/securePayload.js';
+import { subscribeShared } from './sharedSubscriptions.js';
 import {
   collection,
   deleteDoc,
@@ -7,7 +10,7 @@ import {
   setDoc,
   where,
 } from 'firebase/firestore';
-import { db } from '../config/firebase.js';
+import { auth, db } from '../config/firebase.js';
 import { uploadMusicFile, deleteFromStorage } from './storageService.js';
 
 export const DEMO_TRACK_IDS = new Set([
@@ -68,31 +71,68 @@ function openMusicDB() {
   });
 }
 
-export async function saveAudioBlob(id, blobOrDataUrl) {
+export async function saveAudioBlob(
+  id,
+  blobOrDataUrl,
+  expectedUid = auth.currentUser?.uid,
+) {
   try {
     const db = await openMusicDB();
     if (!db) return;
     const tx = db.transaction(STORE_NAME, 'readwrite');
     const store = tx.objectStore(STORE_NAME);
-    store.put({ id, data: blobOrDataUrl });
+    const uid = expectedUid;
+    if (!uid || uid !== auth.currentUser?.uid) {
+      db.close();
+      throw new Error('Sign in to cache files.');
+    }
+    store.put({ id: `${uid}:${id}`, data: blobOrDataUrl });
     return new Promise((resolve) => {
-      tx.oncomplete = () => resolve(true);
-      tx.onerror = () => resolve(false);
+      tx.oncomplete = () => {
+        db.close();
+        resolve(true);
+      };
+      tx.onerror = () => {
+        db.close();
+        resolve(false);
+      };
     });
   } catch (err) {
     console.warn('[IndexedDB] Save audio blob error:', err);
   }
 }
 
-export async function getAudioBlob(id) {
+export async function getAudioBlob(id, expectedUid = auth.currentUser?.uid) {
   try {
     const db = await openMusicDB();
     if (!db) return null;
     const tx = db.transaction(STORE_NAME, 'readonly');
     const store = tx.objectStore(STORE_NAME);
-    const req = store.get(id);
+    const uid = expectedUid;
+    if (!uid || uid !== auth.currentUser?.uid) {
+      db.close();
+      return null;
+    }
+    const req = store.get(`${uid}:${id}`);
     return new Promise((resolve) => {
-      req.onsuccess = () => resolve(req.result?.data || null);
+      req.onsuccess = () => {
+        if (req.result?.data) {
+          resolve(req.result.data);
+          return;
+        }
+        if (
+          !getLocalTracks(uid).some(
+            (record) => record.id === id && record.uid === uid,
+          )
+        ) {
+          resolve(null);
+          return;
+        }
+        const legacy = store.get(id);
+        legacy.onsuccess = () => resolve(legacy.result?.data || null);
+        legacy.onerror = () => resolve(null);
+      };
+      tx.oncomplete = () => db.close();
       req.onerror = () => resolve(null);
     });
   } catch (err) {
@@ -101,13 +141,19 @@ export async function getAudioBlob(id) {
   }
 }
 
-export async function deleteAudioBlob(id) {
+export async function deleteAudioBlob(id, expectedUid = auth.currentUser?.uid) {
   try {
     const db = await openMusicDB();
     if (!db) return;
     const tx = db.transaction(STORE_NAME, 'readwrite');
     const store = tx.objectStore(STORE_NAME);
-    store.delete(id);
+    const uid = expectedUid;
+    if (!uid || uid !== auth.currentUser?.uid) {
+      db.close();
+      return;
+    }
+    store.delete(`${uid}:${id}`);
+    tx.oncomplete = () => db.close();
   } catch (err) {
     console.warn('[IndexedDB] Delete audio blob error:', err);
   }
@@ -129,7 +175,9 @@ export function getLocalTracks(uid) {
     if (raw !== null) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
-        const cleaned = parsed.filter((t) => !isDemoTrack(t));
+        const cleaned = parsed.filter(
+          (record) => record && typeof record.id === 'string',
+        );
         if (cleaned.length !== parsed.length) {
           setLocalTracks(uid, cleaned);
         }
@@ -137,7 +185,7 @@ export function getLocalTracks(uid) {
       }
     }
   } catch (err) {
-    console.warn('[Music] LocalStorage read notice:', err);
+    console.warn('[Music] LocalStorage read notice:');
   }
   return [];
 }
@@ -146,16 +194,25 @@ export function setLocalTracks(uid, tracks) {
   try {
     if (!Array.isArray(tracks)) return;
     const sanitized = tracks
-      .filter((t) => !isDemoTrack(t))
+      .filter((record) => record && typeof record.id === 'string')
       .map((t) => ({
-        ...t,
+        ...pickPersistedFields(t, MUSIC_FIELDS),
         // Strip huge data URLs from localStorage (stored safely in IndexedDB)
-        url: typeof t.url === 'string' && t.url.startsWith('data:') ? '' : t.url,
-        coverUrl: typeof t.coverUrl === 'string' && t.coverUrl.startsWith('data:') ? '' : t.coverUrl,
+        url:
+          t._encryptedLocalPayload ||
+          (typeof t.url === 'string' && /^(data:|blob:)/.test(t.url))
+            ? ''
+            : t.url,
+        coverUrl:
+          typeof t.coverUrl === 'string' && /^(data:|blob:)/.test(t.coverUrl)
+            ? ''
+            : t.coverUrl,
       }));
     localStorage.setItem(getStorageKey(uid), JSON.stringify(sanitized));
+    return true;
   } catch (err) {
-    console.warn('[Music] LocalStorage write notice:', err);
+    console.warn('[Music] LocalStorage write notice:');
+    return false;
   }
 }
 
@@ -164,31 +221,46 @@ let isMusicSyncInProgress = false;
 /**
  * Sync local/unsynced tracks to Firebase Storage & Cloud Firestore
  */
-export async function syncUnsyncedMusicToCloud(uid, businessId, unsyncedTracks = null) {
+export async function syncUnsyncedMusicToCloud(
+  uid,
+  businessId,
+  unsyncedTracks = null,
+) {
   if (!uid || isMusicSyncInProgress) return;
   isMusicSyncInProgress = true;
 
   try {
     const currentLocal = getLocalTracks(uid);
-    const tracksToSync = unsyncedTracks && unsyncedTracks.length > 0
-      ? unsyncedTracks.filter((t) => !isDemoTrack(t))
-      : currentLocal.filter((t) => !isDemoTrack(t) && !t.isCloudSynced);
+    const tracksToSync =
+      unsyncedTracks && unsyncedTracks.length > 0
+        ? unsyncedTracks.filter(
+            (record) => record && typeof record.id === 'string',
+          )
+        : currentLocal.filter((t) => !isDemoTrack(t) && !t.isCloudSynced);
 
     if (!tracksToSync.length) return;
 
     for (const track of tracksToSync) {
-      if (isDemoTrack(track)) continue;
+      if (track.isEncrypted)
+        throw new Error(
+          'Encrypted binary cloud sync is unavailable. Existing data was left intact.',
+        );
       try {
-        let binaryBlob = await getAudioBlob(track.id);
+        let binaryBlob = await getAudioBlob(track.id, uid);
         let finalUrl = track.url || '';
         let storagePath = track.storagePath || null;
 
-        const isAlreadyOnStorage = typeof finalUrl === 'string' && finalUrl.includes('firebasestorage.googleapis.com');
+        const isAlreadyOnStorage =
+          typeof finalUrl === 'string' &&
+          finalUrl.includes('firebasestorage.googleapis.com');
 
         if (!isAlreadyOnStorage && binaryBlob) {
           const uploadRes = await uploadMusicFile({
             file: binaryBlob instanceof Blob ? binaryBlob : null,
-            blobData: typeof binaryBlob === 'string' && binaryBlob.startsWith('data:') ? binaryBlob : null,
+            blobData:
+              typeof binaryBlob === 'string' && binaryBlob.startsWith('data:')
+                ? binaryBlob
+                : null,
             uid,
             id: track.id,
             fileName: track.title || 'track',
@@ -200,7 +272,8 @@ export async function syncUnsyncedMusicToCloud(uid, businessId, unsyncedTracks =
           }
         }
 
-        const isCloudUrl = typeof finalUrl === 'string' && finalUrl.startsWith('http');
+        const isCloudUrl =
+          typeof finalUrl === 'string' && finalUrl.startsWith('http');
         const firestoreTrackDoc = {
           id: track.id,
           title: track.title || '',
@@ -211,8 +284,16 @@ export async function syncUnsyncedMusicToCloud(uid, businessId, unsyncedTracks =
           folder: track.folder || null,
           duration: track.duration || 0,
           fileSize: track.fileSize || 0,
-          url: isCloudUrl ? finalUrl : (track.url?.startsWith('http') ? track.url : ''),
-          coverUrl: typeof track.coverUrl === 'string' && track.coverUrl.startsWith('http') ? track.coverUrl : '',
+          url: isCloudUrl
+            ? finalUrl
+            : track.url?.startsWith('http')
+              ? track.url
+              : '',
+          coverUrl:
+            typeof track.coverUrl === 'string' &&
+            track.coverUrl.startsWith('http')
+              ? track.coverUrl
+              : '',
           isFavorite: Boolean(track.isFavorite),
           isEncrypted: Boolean(track.isEncrypted),
           storagePath: storagePath || null,
@@ -228,10 +309,15 @@ export async function syncUnsyncedMusicToCloud(uid, businessId, unsyncedTracks =
 
         // Update local tracks state with synced record
         const current = getLocalTracks(uid);
-        const updated = current.map((t) => (t.id === track.id ? { ...t, ...firestoreTrackDoc } : t));
+        const updated = current.map((t) =>
+          t.id === track.id ? { ...t, ...firestoreTrackDoc } : t,
+        );
         setLocalTracks(uid, updated);
       } catch (trackSyncErr) {
-        console.warn(`[Music Cloud Sync] Sync notice for track ${track.id}:`, trackSyncErr.message);
+        console.warn(
+          `[Music Cloud Sync] Sync notice for track ${track.id}:`,
+          trackSyncErr.message,
+        );
       }
     }
   } finally {
@@ -261,7 +347,7 @@ export async function cleanupDemoTracksFromCloud(uid) {
 /**
  * Subscribe to tracks in realtime (Firestore snapshot is source of truth, no auto-recreation loop)
  */
-export function subscribeToMusic(uid, businessId, onData, onError) {
+function subscribeToMusicSource(uid, businessId, onData, onError) {
   const localTracks = getLocalTracks(uid);
   onData(localTracks);
 
@@ -276,30 +362,41 @@ export function subscribeToMusic(uid, businessId, onData, onError) {
       (snapshot) => {
         const remoteTracks = snapshot.docs
           .map((docSnap) => ({
-            id: docSnap.id,
             ...docSnap.data(),
+            id: docSnap.id,
           }))
-          .filter((t) => !isDemoTrack(t));
+          .filter((record) => record && typeof record.id === 'string');
 
-        remoteTracks.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
-        setLocalTracks(uid, remoteTracks);
-        onData(remoteTracks);
+        remoteTracks.sort(
+          (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0),
+        );
+        const localOnly = getLocalTracks(uid).filter(
+          (t) => t._encryptedLocalPayload,
+        );
+        const merged = [
+          ...localOnly,
+          ...remoteTracks.filter((t) => !localOnly.some((l) => l.id === t.id)),
+        ];
+        setLocalTracks(uid, merged);
+        onData(merged);
       },
       (error) => {
-        console.warn('[Music Firestore] Fallback to local storage:', error.message);
+        console.warn(
+          '[Music Firestore] Fallback to local storage:',
+          error.message,
+        );
         if (onError) onError(error);
-        onData(getLocalTracks(uid));
-      }
+        onData(error.code === 'permission-denied' ? [] : getLocalTracks(uid));
+      },
     );
 
     return unsubscribe;
   } catch (err) {
     console.warn('[Music] Setup subscription notice:', err);
-    onData(getLocalTracks(uid));
+    onData(error.code === 'permission-denied' ? [] : getLocalTracks(uid));
     return () => {};
   }
 }
-
 
 /**
  * Save or update track (Uploads to Firebase Storage if file or audioBlob is provided)
@@ -313,13 +410,24 @@ export async function saveTrackItem({
   skipLocalTracksUpdate = false,
   onProgress,
 }) {
+  if (!uid || uid !== auth.currentUser?.uid)
+    throw new Error('Sign in to save files.');
+  if (
+    track.isEncrypted &&
+    !track._encryptedLocalPayload &&
+    !isLegacyCiphertext(track.url)
+  )
+    throw new Error('Encrypted records require ciphertext.');
+  const encryptedBinary = Boolean(track.isEncrypted && (file || audioBlob));
   const now = new Date().toISOString();
   let finalUrl = track.url || '';
   let storagePath = track.storagePath || null;
 
   // 1. Upload to Firebase Storage if binary data/file is provided and not already on storage
-  const isAlreadyOnStorage = typeof finalUrl === 'string' && finalUrl.includes('firebasestorage.googleapis.com');
-  if ((file || audioBlob) && !isAlreadyOnStorage) {
+  const isAlreadyOnStorage =
+    typeof finalUrl === 'string' &&
+    finalUrl.includes('firebasestorage.googleapis.com');
+  if (!track.isEncrypted && (file || audioBlob) && !isAlreadyOnStorage) {
     try {
       const uploadRes = await uploadMusicFile({
         file,
@@ -335,23 +443,43 @@ export async function saveTrackItem({
         storagePath = uploadRes.storagePath;
       }
     } catch (storageErr) {
-      console.warn('[Firebase Storage] Music upload notice, keeping local fallback:', storageErr);
+      console.warn(
+        '[Firebase Storage] Music upload notice, keeping local fallback:',
+        storageErr,
+      );
     }
   }
 
+  if (uid !== auth.currentUser?.uid)
+    throw new Error('Your session changed. Retry after signing in.');
   const trackItem = {
-    ...track,
+    ...pickPersistedFields(track, MUSIC_FIELDS),
+    _encryptedLocalPayload: Boolean(
+      track._encryptedLocalPayload || encryptedBinary,
+    ),
     url: finalUrl,
     storagePath,
-    isCloudSynced: Boolean(storagePath || (typeof finalUrl === 'string' && finalUrl.includes('firebasestorage.googleapis.com'))),
+    isCloudSynced: Boolean(
+      storagePath ||
+        (typeof finalUrl === 'string' &&
+          finalUrl.includes('firebasestorage.googleapis.com')),
+    ),
     uid: uid || 'local',
-    businessId: businessId || null,
+    businessId: track.businessId ?? businessId ?? null,
     updatedAt: now,
   };
 
   // 2. If binary blob exists, store in IndexedDB as fast local cache
   if (audioBlob || file) {
-    await saveAudioBlob(trackItem.id, audioBlob || file);
+    const cached = await saveAudioBlob(
+      trackItem.id,
+      track.isEncrypted ? track.url : audioBlob || file,
+      uid,
+    );
+    if (track.isEncrypted && !cached)
+      throw new Error(
+        'Encrypted local storage is unavailable. Nothing was saved.',
+      );
   }
 
   // 3. Local storage update (sanitized)
@@ -368,9 +496,10 @@ export async function saveTrackItem({
   }
 
   // 4. Firestore update (ALWAYS sanitize - never write large data: URLs to Firestore)
-  if (uid) {
+  if (uid && !trackItem._encryptedLocalPayload) {
     try {
-      const isCloudUrl = typeof trackItem.url === 'string' && trackItem.url.startsWith('http');
+      const isCloudUrl =
+        typeof trackItem.url === 'string' && trackItem.url.startsWith('http');
       const firestoreTrackDoc = {
         id: trackItem.id,
         title: trackItem.title || '',
@@ -382,8 +511,16 @@ export async function saveTrackItem({
         duration: trackItem.duration || 0,
         fileSize: trackItem.fileSize || 0,
         // ONLY write public HTTP/HTTPS URL, never huge data: URLs
-        url: isCloudUrl ? trackItem.url : '',
-        coverUrl: typeof trackItem.coverUrl === 'string' && trackItem.coverUrl.startsWith('http') ? trackItem.coverUrl : '',
+        url: trackItem.isEncrypted
+          ? trackItem.url
+          : isCloudUrl
+            ? trackItem.url
+            : '',
+        coverUrl:
+          typeof trackItem.coverUrl === 'string' &&
+          trackItem.coverUrl.startsWith('http')
+            ? trackItem.coverUrl
+            : '',
         isFavorite: Boolean(trackItem.isFavorite),
         isEncrypted: Boolean(trackItem.isEncrypted),
         storagePath: trackItem.storagePath || null,
@@ -407,31 +544,47 @@ export async function saveTrackItem({
 /**
  * Save multiple tracks in batch (Optimized for minimal overhead)
  */
-export async function saveBatchTrackItems(batch, uid, businessId, onBatchProgress) {
+export async function saveBatchTrackItems(
+  batch,
+  uid,
+  businessId,
+  onBatchProgress,
+) {
   const savedTracks = [];
-  for (let i = 0; i < batch.length; i++) {
-    const { track, file, audioBlob } = batch[i];
-    const saved = await saveTrackItem({
-      track,
-      file,
-      audioBlob,
-      uid,
-      businessId,
-      skipLocalTracksUpdate: true,
-      onProgress: (percent) => {
-        if (typeof onBatchProgress === 'function') {
-          onBatchProgress({ index: i, total: batch.length, percent });
-        }
-      },
-    });
-    savedTracks.push(saved);
+  try {
+    for (let i = 0; i < batch.length; i++) {
+      const { track, file, audioBlob } = batch[i];
+      const saved = await saveTrackItem({
+        track,
+        file,
+        audioBlob,
+        uid,
+        businessId,
+        skipLocalTracksUpdate: true,
+        onProgress: (percent) => {
+          if (typeof onBatchProgress === 'function') {
+            onBatchProgress({ index: i, total: batch.length, percent });
+          }
+        },
+      });
+      savedTracks.push(saved);
+    }
+  } finally {
+    // Update localStorage once for the entire batch
+    const current = getLocalTracks(uid);
+    const next = [
+      ...savedTracks,
+      ...current.filter((c) => !savedTracks.some((s) => s.id === c.id)),
+    ];
+    if (
+      savedTracks.length &&
+      !setLocalTracks(uid, next) &&
+      savedTracks.some((record) => record._encryptedLocalPayload)
+    )
+      throw new Error(
+        'Encrypted file metadata could not be saved. Check browser storage and retry.',
+      );
   }
-
-  // Update localStorage once for the entire batch
-  const current = getLocalTracks(uid);
-  const next = [...savedTracks, ...current.filter((c) => !savedTracks.some((s) => s.id === c.id))];
-  setLocalTracks(uid, next);
-
   return savedTracks;
 }
 
@@ -443,7 +596,11 @@ export async function deleteTrackItem(trackId, uid) {
   const targetTrack = current.find((t) => t.id === trackId);
 
   // 1. Delete from Firebase Storage if stored on cloud
-  if (targetTrack?.storagePath || (targetTrack?.url && targetTrack.url.includes('firebasestorage.googleapis.com'))) {
+  if (
+    targetTrack?.storagePath ||
+    (targetTrack?.url &&
+      targetTrack.url.includes('firebasestorage.googleapis.com'))
+  ) {
     try {
       await deleteFromStorage(targetTrack.storagePath || targetTrack.url);
     } catch (err) {
@@ -476,8 +633,16 @@ export async function deleteTrackItem(trackId, uid) {
 
 export function parseAudioFile(file) {
   return new Promise((resolve, reject) => {
-    if (!file || (!file.type?.startsWith('audio/') && !/\.(mp3|wav|flac|m4a|ogg|aac)$/i.test(file.name))) {
-      reject(new Error('Ֆայլը չի հանդիսանում աուդիո ֆայլ (MP3, WAV, FLAC, M4A, OGG)'));
+    if (
+      !file ||
+      (!file.type?.startsWith('audio/') &&
+        !/\.(mp3|wav|flac|m4a|ogg|aac)$/i.test(file.name))
+    ) {
+      reject(
+        new Error(
+          'Ֆայլը չի հանդիսանում աուդիո ֆայլ (MP3, WAV, FLAC, M4A, OGG)',
+        ),
+      );
       return;
     }
 
@@ -599,7 +764,7 @@ export function getLocalMusicFolders(uid) {
       }
     }
   } catch (err) {
-    console.warn('[Music Folders] LocalStorage read notice:', err);
+    console.warn('[Music Folders] LocalStorage read notice:');
   }
   return [];
 }
@@ -610,18 +775,26 @@ export function setLocalMusicFolders(uid, folders) {
     const cleaned = folders.filter((f) => !isDemoFolder(f));
     localStorage.setItem(getFoldersStorageKey(uid), JSON.stringify(cleaned));
   } catch (err) {
-    console.warn('[Music Folders] LocalStorage write notice:', err);
+    console.warn('[Music Folders] LocalStorage write notice:');
   }
 }
 
-export async function syncUnsyncedMusicFoldersToCloud(uid, businessId, unsyncedFolders = null) {
+export async function syncUnsyncedMusicFoldersToCloud(
+  uid,
+  businessId,
+  unsyncedFolders = null,
+) {
   if (!uid) return;
   const folders = unsyncedFolders || getLocalMusicFolders(uid);
   for (const f of folders) {
     if (isDemoFolder(f)) continue;
     try {
       const docRef = doc(db, 'music_folders', f.id);
-      await setDoc(docRef, { ...f, uid, businessId: businessId || null }, { merge: true });
+      await setDoc(
+        docRef,
+        { ...f, uid, businessId: businessId || null },
+        { merge: true },
+      );
     } catch (err) {
       console.warn('[Music Folders Cloud Sync] Notice:', err.message);
     }
@@ -645,7 +818,7 @@ export async function cleanupDemoFoldersFromCloud(uid) {
   return deletedCount;
 }
 
-export function subscribeToMusicFolders(uid, businessId, onData, onError) {
+function subscribeToMusicFoldersSource(uid, businessId, onData, onError) {
   const local = getLocalMusicFolders(uid);
   onData(local);
 
@@ -660,26 +833,30 @@ export function subscribeToMusicFolders(uid, businessId, onData, onError) {
       (snapshot) => {
         const remote = snapshot.docs
           .map((docSnap) => ({
-            id: docSnap.id,
             ...docSnap.data(),
+            id: docSnap.id,
           }))
           .filter((f) => !isDemoFolder(f));
 
-        remote.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+        remote.sort(
+          (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0),
+        );
         setLocalMusicFolders(uid, remote);
         onData(remote);
       },
       (error) => {
         console.warn('[Music Folders] Firestore notice:', error.message);
         if (onError) onError(error);
-        onData(getLocalMusicFolders(uid));
-      }
+        onData(
+          error.code === 'permission-denied' ? [] : getLocalMusicFolders(uid),
+        );
+      },
     );
 
     return unsubscribe;
   } catch (err) {
     console.warn('[Music Folders] Setup notice:', err);
-    onData(getLocalMusicFolders(uid));
+    onData(error.code === 'permission-denied' ? [] : getLocalMusicFolders(uid));
     return () => {};
   }
 }
@@ -740,7 +917,10 @@ export async function scanDroppedItems(dataTransfer) {
     let entries;
     do {
       entries = await new Promise((resolve) => {
-        dirReader.readEntries((batch) => resolve(batch || []), () => resolve([]));
+        dirReader.readEntries(
+          (batch) => resolve(batch || []),
+          () => resolve([]),
+        );
       });
       if (entries && entries.length > 0) {
         all.push(...entries);
@@ -751,7 +931,10 @@ export async function scanDroppedItems(dataTransfer) {
 
   const getFileFromEntry = (fileEntry) => {
     return new Promise((resolve) => {
-      fileEntry.file((f) => resolve(f), () => resolve(null));
+      fileEntry.file(
+        (f) => resolve(f),
+        () => resolve(null),
+      );
     });
   };
 
@@ -783,7 +966,9 @@ export async function scanDroppedItems(dataTransfer) {
       if (typeof item.webkitGetAsEntry === 'function') {
         const entry = item.webkitGetAsEntry();
         if (entry) {
-          promises.push(scanEntry(entry, entry.isDirectory ? entry.name : null));
+          promises.push(
+            scanEntry(entry, entry.isDirectory ? entry.name : null),
+          );
         }
       }
     }
@@ -802,3 +987,28 @@ export async function scanDroppedItems(dataTransfer) {
   }));
 }
 
+export function subscribeToMusic(uid, businessId, onData, onError) {
+  if (!uid) {
+    onData([]);
+    return () => {};
+  }
+  return subscribeShared(
+    'subscribeToMusic:' + uid,
+    (emit, fail) => subscribeToMusicSource(uid, businessId, emit, fail),
+    onData,
+    onError,
+  );
+}
+
+export function subscribeToMusicFolders(uid, businessId, onData, onError) {
+  if (!uid) {
+    onData([]);
+    return () => {};
+  }
+  return subscribeShared(
+    'subscribeToMusicFolders:' + uid,
+    (emit, fail) => subscribeToMusicFoldersSource(uid, businessId, emit, fail),
+    onData,
+    onError,
+  );
+}

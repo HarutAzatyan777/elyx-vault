@@ -1,0 +1,66 @@
+export function pickPersistedFields(record, fields) {
+  return Object.fromEntries(
+    fields
+      .filter((field) => Object.hasOwn(record, field))
+      .map((field) => [field, record[field]]),
+  );
+}
+export const NOTE_FIELDS = [
+  'id',
+  'title',
+  'content',
+  'category',
+  'tags',
+  'isPinned',
+  'isEncrypted',
+  'uid',
+  'businessId',
+  'createdAt',
+  'updatedAt',
+  '_pendingCloud',
+];
+export const MUSIC_FIELDS = [
+  'id',
+  'title',
+  'artist',
+  'album',
+  'genre',
+  'folderId',
+  'folder',
+  'duration',
+  'fileSize',
+  'url',
+  'coverUrl',
+  'isFavorite',
+  'isEncrypted',
+  'storagePath',
+  'isCloudSynced',
+  'uid',
+  'businessId',
+  'createdAt',
+  'updatedAt',
+  '_encryptedLocalPayload',
+];
+export const MEDIA_FIELDS = [
+  'id',
+  'title',
+  'description',
+  'type',
+  'url',
+  'thumbnailUrl',
+  'youtubeId',
+  'category',
+  'tags',
+  'isFavorite',
+  'isEncrypted',
+  'fileSize',
+  'dimensions',
+  'duration',
+  'storagePath',
+  'isCloudSynced',
+  'uid',
+  'businessId',
+  'createdAt',
+  'updatedAt',
+  '_encryptedLocalPayload',
+];

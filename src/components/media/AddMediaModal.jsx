@@ -1,3 +1,4 @@
+import { sanitizeUrl } from '../../utils/workspaceValidation.js';
 import React, { useState, useRef } from 'react';
 import {
   MEDIA_CATEGORIES,
@@ -6,7 +7,7 @@ import {
   formatBytes,
   formatDuration,
 } from '../../services/mediaService';
-import { encryptData } from '../../utils/crypto';
+import { encryptRequired } from '../../utils/securePayload.js';
 import styles from './AddMediaModal.module.css';
 
 export const AddMediaModal = ({
@@ -125,7 +126,8 @@ export const AddMediaModal = ({
 
       setIsSubmitting(true);
       try {
-        const finalUrl = mediaUrl.trim();
+        const finalUrl = sanitizeUrl(mediaUrl);
+        if (!finalUrl) throw new Error('Use an HTTP or HTTPS media URL.');
         const ytId = parseYouTubeVideoId(finalUrl);
         let finalType = 'image';
         let finalThumbnail = '';
@@ -141,10 +143,10 @@ export const AddMediaModal = ({
         let savedUrl = finalUrl;
         let savedThumbnail = finalThumbnail;
         if (isEncrypted && masterPassword) {
-          const encUrl = encryptData(finalUrl, masterPassword);
+          const encUrl = encryptRequired(finalUrl, masterPassword);
           if (encUrl) savedUrl = encUrl;
           if (savedThumbnail) {
-            const encThumb = encryptData(savedThumbnail, masterPassword);
+            const encThumb = encryptRequired(savedThumbnail, masterPassword);
             if (encThumb) savedThumbnail = encThumb;
           }
         }
@@ -193,10 +195,10 @@ export const AddMediaModal = ({
         let savedThumbnail = qItem.thumbnailUrl || qItem.blobUrl || '';
 
         if (isEncrypted && masterPassword) {
-          const encUrl = encryptData(qItem.dataUrl, masterPassword);
+          const encUrl = encryptRequired(qItem.dataUrl, masterPassword);
           if (encUrl) savedUrl = encUrl;
           if (savedThumbnail) {
-            const encThumb = encryptData(savedThumbnail, masterPassword);
+            const encThumb = encryptRequired(savedThumbnail, masterPassword);
             if (encThumb) savedThumbnail = encThumb;
           }
         }

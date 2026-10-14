@@ -89,3 +89,17 @@ To access your terminal remotely outside your local network without public IP ex
 - **Path Whitelisting**: Terminal initial working directory must exist inside `allowedDirectories`.
 - **Zero Input Logging**: Terminal input and commands are NEVER logged or stored in Firestore.
 - **Least Privilege**: Runs as standard Windows user (never Administrator or SYSTEM).
+
+## Task 09 security configuration
+
+The agent now fails closed. Before connecting:
+
+1. Copy `config.json.example` to `config.json`. Set `authorizedUserIds` to the specific Firebase Auth UIDs allowed to operate this machine. Find your UID in Elyx System Settings → Account. An account must also have an active `owner` or `manager` access record.
+2. Set exact `allowedOrigins` for your Elyx deployment. The default empty list denies browser requests. Do not use wildcard origins.
+3. Set `FIREBASE_PROJECT_ID` and configure Application Default Credentials for the same Firebase project. Keep the Admin SDK service account on the agent machine; never put it in browser code or a Vite environment variable. Give it only the server privileges it needs to verify Auth and read access/device records.
+4. Register the machine in Elyx using the physical Agent Device ID printed on startup, rather than just the Firestore document ID. Older device registrations must be configured with their actual device ID before terminal access works.
+5. Keep the default loopback bind (`127.0.0.1`). Remote access requires an HTTPS/WSS reverse proxy or secure Tailscale endpoint; non-loopback plaintext endpoints are rejected by the frontend.
+
+Each connection verifies a Firebase ID token with revocation checking, an active permitted role, an explicitly paired UID, and matching approved device ownership. The signed terminal session expires after five minutes and closes at expiry. Reconnect to verify access again. Session tokens travel in a WebSocket subprotocol header, not in a URL query. Without an operator signing secret, an unpredictable per-process secret invalidates existing sessions on agent restart. This does not rotate vault encryption keys.
+
+Allowed directories constrain initial working directories only. A terminal grants the rights of the agent process and is **not** an operating system sandbox. Run the agent under an appropriately restricted OS account. A revoked user can retain an already connected session until its five-minute expiry if their client does not disconnect; initial connection verification is not continuous server-side revocation polling.

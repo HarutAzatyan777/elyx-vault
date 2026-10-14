@@ -1,14 +1,13 @@
 import React, { useState } from 'react';
-import { useMusic } from '../../context/MusicContext';
+import { useMusic, useMusicProgress } from '../../context/MusicContext';
 import { formatAudioDuration } from '../../services/musicService';
 import styles from './GlobalAudioPlayer.module.css';
 
 export const GlobalAudioPlayer = () => {
+  const { currentTime, duration } = useMusicProgress();
   const {
     currentTrack,
     isPlaying,
-    currentTime,
-    duration,
     volume,
     isMuted,
     repeatMode,

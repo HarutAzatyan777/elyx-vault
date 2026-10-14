@@ -79,7 +79,7 @@ export function SystemMenu({
           }}
         >
           <span className={styles.itemIcon}>🔒</span>
-          <span>Lock Vault (Zero-Knowledge)</span>
+          <span>Lock Vault (Client-side encryption)</span>
         </button>
       )}
 

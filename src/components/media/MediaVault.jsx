@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { usePagedItems } from '../../os/hooks/usePagedItems.js';
+import LibraryPagination from '../../os/shell/LibraryPagination.jsx';
+import React, { useState, useDeferredValue, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../../hooks/useAuth.jsx';
 import {
   subscribeToMedia,
@@ -25,11 +27,13 @@ export const MediaVault = ({ masterPassword, onUnlockVault }) => {
   const [selectedTypeFilter, setSelectedTypeFilter] = useState('all'); // 'all' | 'image' | 'video' | 'favorite' | 'encrypted'
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const deferredSearch = useDeferredValue(searchQuery);
   const [sortBy, setSortBy] = useState('newest'); // 'newest' | 'oldest' | 'title' | 'size'
   const [gridDensity, setGridDensity] = useState('standard'); // 'standard' | 'compact'
 
   // Drag and drop overlay state
   const [isWindowDragging, setIsWindowDragging] = useState(false);
+  const dropSurfaceRef = useRef(null);
   const dragCounterRef = useRef(0);
 
   // Modals state
@@ -162,25 +166,27 @@ export const MediaVault = ({ masterPassword, onUnlockVault }) => {
       }
     };
 
-    window.addEventListener('dragenter', handleDragEnter);
-    window.addEventListener('dragleave', handleDragLeave);
-    window.addEventListener('dragover', handleDragOver);
-    window.addEventListener('drop', handleDrop);
+    const surface = dropSurfaceRef.current;
+    if (!surface) return;
+    surface.addEventListener('dragenter', handleDragEnter);
+    surface.addEventListener('dragleave', handleDragLeave);
+    surface.addEventListener('dragover', handleDragOver);
+    surface.addEventListener('drop', handleDrop);
 
     return () => {
-      window.removeEventListener('dragenter', handleDragEnter);
-      window.removeEventListener('dragleave', handleDragLeave);
-      window.removeEventListener('dragover', handleDragOver);
-      window.removeEventListener('drop', handleDrop);
+      surface.removeEventListener('dragenter', handleDragEnter);
+      surface.removeEventListener('dragleave', handleDragLeave);
+      surface.removeEventListener('dragover', handleDragOver);
+      surface.removeEventListener('drop', handleDrop);
     };
   }, [uid, businessId]);
 
   // Handle Save Batch
   const handleSaveMediaBatch = async (batch) => {
-    showToast(`☁️ Վերբեռնվում է ${batch.length} ֆայլ Firebase Storage...`, 'info');
+    showToast(`Saving ${batch.length} items…`, 'info');
     const saved = await saveBatchMediaItems(batch, uid, businessId);
     setMediaItems((prev) => [...saved, ...prev.filter((m) => !saved.some((s) => s.id === m.id))]);
-    showToast(`✨ ${saved.length} մեդիա ֆայլ հաջողությամբ պահպանվեց Firebase Storage-ում!`, 'success');
+    showToast(`${saved.length} items saved.${saved.some(item => item._encryptedLocalPayload) ? ' Encrypted files are stored on this device only.' : ''}`, 'success');
   };
 
   // Handle Delete Item
@@ -227,8 +233,8 @@ export const MediaVault = ({ masterPassword, onUnlockVault }) => {
     }
 
     // Search query
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
+    if (deferredSearch.trim()) {
+      const q = deferredSearch.toLowerCase();
       result = result.filter((m) => {
         const titleMatch = (m.title || '').toLowerCase().includes(q);
         const descMatch = (m.description || '').toLowerCase().includes(q);
@@ -249,7 +255,9 @@ export const MediaVault = ({ masterPassword, onUnlockVault }) => {
     }
 
     return result;
-  }, [mediaItems, selectedTypeFilter, selectedCategory, searchQuery, sortBy]);
+  }, [mediaItems, selectedTypeFilter, selectedCategory, deferredSearch, sortBy]);
+
+  const pagination = usePagedItems(processedMedia);
 
   // Statistics
   const stats = useMemo(() => {
@@ -285,7 +293,8 @@ export const MediaVault = ({ masterPassword, onUnlockVault }) => {
   };
 
   return (
-    <div className={styles.container}>
+    <div ref={dropSurfaceRef} className={styles.container}>
+      <LibraryPagination pagination={pagination} />
       {/* Toast Alert */}
       {toastMessage && (
         <div className={`${styles.toast} ${styles[`toast_${toastMessage.type}`]}`}>
@@ -528,7 +537,7 @@ export const MediaVault = ({ masterPassword, onUnlockVault }) => {
             gridDensity === 'compact' ? styles.mediaGridCompact : ''
           }`}
         >
-          {processedMedia.map((item) => (
+          {pagination.items.map((item) => (
             <MediaCard
               key={item.id}
               item={item}

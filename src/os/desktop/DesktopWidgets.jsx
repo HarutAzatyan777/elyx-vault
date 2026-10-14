@@ -51,7 +51,7 @@ export function DesktopWidgets({
         />
       )}
 
-      {visibleWidgets.notes && (
+      {visibleWidgets.notes && isVaultUnlocked && (
         <QuickNotesWidget
           onOpenApp={onOpenApp}
           onRemove={() => onToggleWidget?.('notes', false)}

@@ -16,7 +16,10 @@ class PtySessionManager {
 
     // Validate directory path
     const pathResult = validateDirectoryPath(cwd || process.cwd(), allowedDirectories);
-    const initialCwd = pathResult.valid ? pathResult.resolvedPath : process.cwd();
+    if (!pathResult.valid) throw new Error('Working directory is not authorized.');
+    const initialCwd = pathResult.resolvedPath;
+    cols = Math.max(20,Math.min(500,Number.isFinite(cols) ? Math.floor(cols) : 80));
+    rows = Math.max(5,Math.min(200,Number.isFinite(rows) ? Math.floor(rows) : 24));
 
     // Determine shell executable (prefer powershell.exe on Windows)
     const isWindows = os.platform() === 'win32';
@@ -99,9 +102,9 @@ class PtySessionManager {
     const session = this.sessions.get(sessionId);
     if (!session || !session.ptyProcess) return;
 
-    if (typeof cols === 'number' && typeof rows === 'number' && cols > 0 && rows > 0) {
+    if (Number.isFinite(cols) && Number.isFinite(rows) && cols > 0 && rows > 0) {
       try {
-        session.ptyProcess.resize(cols, rows);
+        session.ptyProcess.resize(Math.min(500, Math.floor(cols)), Math.min(200, Math.floor(rows)));
         logger.info('PTY resized', { sessionId, cols, rows });
       } catch (err) {
         logger.error('Failed to resize PTY', err, { sessionId });

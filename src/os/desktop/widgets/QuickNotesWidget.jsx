@@ -1,31 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import styles from './Widgets.module.css';
 
-const QUICK_NOTE_STORAGE_KEY = 'elyx_desktop_quick_note';
 
 export function QuickNotesWidget({ onOpenApp, onRemove }) {
-  const [content, setContent] = useState(() => {
-    try {
-      return localStorage.getItem(QUICK_NOTE_STORAGE_KEY) || '';
-    } catch {
-      return '';
-    }
-  });
-
-  const [savedStatus, setSavedStatus] = useState('Saved');
-
+  const [content, setContent] = useState('');
+  const savedStatus = 'Session draft';
   useEffect(() => {
-    try {
-      localStorage.setItem(QUICK_NOTE_STORAGE_KEY, content);
-      setSavedStatus('Saved');
-    } catch {
-      setSavedStatus('Draft');
-    }
-  }, [content]);
+    const clear = () => setContent('');
+    window.addEventListener('elyx:vault-locked', clear);
+    return () => window.removeEventListener('elyx:vault-locked', clear);
+  }, []);
 
   const handleChange = (e) => {
     setContent(e.target.value);
-    setSavedStatus('Saving…');
   };
 
   return (
@@ -55,7 +42,7 @@ export function QuickNotesWidget({ onOpenApp, onRemove }) {
         className={styles.quickNoteTextarea}
         value={content}
         onChange={handleChange}
-        placeholder="Type a quick scratchpad note or paste a snippet…"
+        placeholder="Session draft. Locking clears it; save important notes in Notepad."
         rows={4}
         aria-label="Quick note content"
       />

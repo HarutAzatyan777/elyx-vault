@@ -39,36 +39,38 @@ export function FileManager({
 
   // Subscribe to Media Vault in real-time
   useEffect(() => {
-    if (!uid) return;
+    if (!uid || !masterPassword) { setMediaList([]); setNotesList([]); setMusicList([]); setSelectedFile(null); return; }
     const unsub = subscribeToMedia(uid, businessId, (items) => {
       setMediaList(items || []);
     });
-    return () => {
+    if (!masterPassword) return <p role="status">Unlock the vault to browse files. Previews are hidden while locked.</p>;
+
+  return () => {
       if (typeof unsub === 'function') unsub();
     };
-  }, [uid, businessId]);
+  }, [uid, businessId, masterPassword]);
 
   // Subscribe to Notes in real-time
   useEffect(() => {
-    if (!uid) return;
+    if (!uid || !masterPassword) { setMediaList([]); setNotesList([]); setMusicList([]); setSelectedFile(null); return; }
     const unsub = subscribeToNotes(uid, businessId, (notes) => {
       setNotesList(notes || []);
     });
     return () => {
       if (typeof unsub === 'function') unsub();
     };
-  }, [uid, businessId]);
+  }, [uid, businessId, masterPassword]);
 
   // Subscribe to Music Vault in real-time
   useEffect(() => {
-    if (!uid) return;
+    if (!uid || !masterPassword) { setMediaList([]); setNotesList([]); setMusicList([]); setSelectedFile(null); return; }
     const unsub = subscribeToMusic(uid, businessId, (tracks) => {
       setMusicList(tracks || []);
     });
     return () => {
       if (typeof unsub === 'function') unsub();
     };
-  }, [uid, businessId]);
+  }, [uid, businessId, masterPassword]);
 
   // Compute normalized files for current location
   const currentFiles = useMemo(() => {
@@ -315,7 +317,7 @@ export function FileManager({
                   >
                     {/* Thumbnail / Icon preview */}
                     <div className={styles.fileThumbnail}>
-                      {file.type === 'image' && file.thumbnailUrl ? (
+                      {!file.isEncrypted && file.type === 'image' && file.thumbnailUrl ? (
                         <img src={file.thumbnailUrl} alt="" className={styles.thumbImg} />
                       ) : file.type === 'video' ? (
                         <div className={styles.thumbVideoBadge}>🎬 Video</div>
@@ -464,11 +466,11 @@ export function FileManager({
           <div className={styles.inspectorBody}>
             {/* Live Preview */}
             <div className={styles.inspectorPreviewBox}>
-              {selectedFile.type === 'image' && selectedFile.url ? (
+              {!selectedFile.isEncrypted && selectedFile.type === 'image' && selectedFile.url ? (
                 <img src={selectedFile.url} alt="" className={styles.previewImage} />
-              ) : selectedFile.type === 'audio' && selectedFile.url ? (
+              ) : !selectedFile.isEncrypted && selectedFile.type === 'audio' && selectedFile.url ? (
                 <audio controls src={selectedFile.url} className={styles.previewAudio} />
-              ) : selectedFile.contentSnippet ? (
+              ) : !selectedFile.isEncrypted && selectedFile.contentSnippet ? (
                 <pre className={styles.previewSnippet}>{selectedFile.contentSnippet}</pre>
               ) : (
                 <div className={styles.previewGeneric}>

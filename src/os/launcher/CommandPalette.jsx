@@ -55,7 +55,7 @@ export function CommandPalette({
     const list = [
       {
         id: 'cmd_lock_vault',
-        title: isVaultUnlocked ? 'Lock Zero-Knowledge Vault' : 'Unlock Zero-Knowledge Vault',
+        title: isVaultUnlocked ? 'Lock Elyx Vault' : 'Unlock Elyx Vault',
         description: isVaultUnlocked
           ? 'Purge decrypted session keys from RAM immediately'
           : 'Enter Master Password to decrypt protected storage',

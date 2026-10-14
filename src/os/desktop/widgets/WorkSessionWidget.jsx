@@ -1,22 +1,22 @@
 import React, { useEffect, useState } from 'react';
-import { useDailyWorkspace } from '../../../hooks/useDailyWorkspace.js';
+import { useSystemStatus } from '../../hooks/useSystemStatus.js';
 import styles from './Widgets.module.css';
 
 export function WorkSessionWidget({ onOpenApp, onRemove }) {
-  const { activeSession, presets } = useDailyWorkspace();
+  const { session: activeSession } = useSystemStatus();
   const [elapsedTime, setElapsedTime] = useState('00:00:00');
 
   useEffect(() => {
-    if (!activeSession?.startedAt) {
+    if (!activeSession?.startTime) {
       setElapsedTime('00:00:00');
       return;
     }
 
     const interval = setInterval(() => {
       try {
-        const start = activeSession.startedAt?.toDate
-          ? activeSession.startedAt.toDate()
-          : new Date(activeSession.startedAt);
+        const start = activeSession.startTime?.toDate
+          ? activeSession.startTime.toDate()
+          : new Date(activeSession.startTime);
         const diffMs = Math.max(0, Date.now() - start.getTime());
         const hours = Math.floor(diffMs / 3600000);
         const minutes = Math.floor((diffMs % 3600000) / 60000);
@@ -34,7 +34,7 @@ export function WorkSessionWidget({ onOpenApp, onRemove }) {
   }, [activeSession]);
 
   const presetName =
-    presets.find((p) => p.id === activeSession?.presetId)?.name || 'Custom Session';
+    activeSession?.presetName || 'Custom Session';
 
   return (
     <div className={styles.widgetCard} role="region" aria-label="Work Session">

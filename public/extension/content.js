@@ -1,9 +1,40 @@
 /**
  * Elyx Vault Chrome Extension Content Script (Manifest V3)
- * Injected into web pages across domains (GitHub, GitLab, Google, etc.) to securely auto-fill credentials.
+ * Injected into web pages across domains (Google, GitHub, GitLab, etc.) to auto-fill credentials.
+ * Supports cross-context background messaging, active pulling of pending credentials,
+ * and multi-step automated login flows.
  */
 
 (() => {
+  /**
+   * Synchronously cached credentials payload to avoid async promise lookup delays
+   * during rapid SPA step transitions.
+   */
+  const timers = new Set();
+  const observers = new Set();
+  const trackedTimeout = (callback, delay) => { const id = setTimeout(() => { timers.delete(id); callback(); }, delay); timers.add(id); return id; };
+  const trackedInterval = (callback, delay) => { const id = setInterval(callback, delay); timers.add(id); return id; };
+  const createObserver = callback => { const observer = new MutationObserver(callback); observers.add(observer); return observer; };
+  const clearCredentials = () => { cachedCredentials = {email:'',password:''}; for (const id of timers) { clearTimeout(id); clearInterval(id); } timers.clear(); for (const observer of observers) observer.disconnect(); observers.clear(); };
+  let cachedCredentials = { email: '', password: '' };
+
+  try { sessionStorage.removeItem('__elyx_cached_creds'); } catch {}
+  trackedTimeout(() => { cachedCredentials = {email:'',password:''}; }, 60000);
+
+  /**
+   * Updates in-memory synchronous credentials cache and keeps credentials only in isolated script memory.
+   *
+   * @param {{ email?: string, username?: string, password?: string }} credentials
+   */
+  function updateCachedCredentials(credentials) {
+    if (!credentials) return;
+    if (credentials.email) cachedCredentials.email = credentials.email;
+    if (credentials.username && !cachedCredentials.email) cachedCredentials.email = credentials.username;
+    if (credentials.password) cachedCredentials.password = credentials.password;
+
+
+  }
+
   /**
    * Safely fills an HTML input element and dispatches standard DOM events
    * to ensure React, Vue, Angular, and legacy forms update their internal state.
@@ -12,28 +43,30 @@
    * @param {string} value - Text value to insert
    */
   function fillInputValue(element, value) {
-    if (!element || value === undefined || value === null) return;
+    if (!element || value === undefined || value === null || value === '') return;
 
-    element.focus();
+    try {
+      element.focus();
+    } catch (e) {}
 
-    // Use HTMLInputElement prototype setter if available (bypasses React state overrides)
-    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-      window.HTMLInputElement.prototype,
-      'value'
-    )?.set;
-
-    if (nativeInputValueSetter) {
-      nativeInputValueSetter.call(element, value);
-    } else {
+    // Use native prototype setter to support React, Angular, Vue and native forms
+    try {
+      const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+      if (nativeInputValueSetter) {
+        nativeInputValueSetter.call(element, value);
+      } else {
+        element.value = value;
+      }
+    } catch (e) {
       element.value = value;
     }
 
-    // Trigger full event lifecycle
-    element.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
-    element.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
-    element.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: value.slice(-1) || 'a' }));
-    element.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: value.slice(-1) || 'a' }));
-    element.blur();
+    // Dispatch full synthetic event lifecycle for React, Angular, and native forms
+    try {
+      element.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+      element.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+      element.dispatchEvent(new Event('blur', { bubbles: true, composed: true }));
+    } catch (e) {}
   }
 
   /**
@@ -52,8 +85,7 @@
   }
 
   /**
-   * Finds and fills username/email & password fields on generic and domain-specific single-step login pages.
-   * Supports GitHub, GitLab, Bitbucket, Amazon, Google, and standard forms.
+   * Finds and fills username/email & password fields on generic single-step login pages.
    *
    * @param {{ email?: string, username?: string, password?: string }} credentials
    * @returns {boolean} Whether both email and password fields were found and filled
@@ -62,7 +94,6 @@
     const emailValue = credentials.email || credentials.username || '';
     const passwordValue = credentials.password || '';
 
-    // Email / Username Selectors across popular platforms
     const emailSelectors = [
       '#login_field',                 // GitHub
       '#user_login',                  // GitLab / WordPress
@@ -81,7 +112,6 @@
       '#identifierId'
     ];
 
-    // Password Selectors across popular platforms
     const passwordSelectors = [
       '#password',                    // GitHub / GitLab
       '#user_password',               // GitLab / WordPress
@@ -97,7 +127,7 @@
     let emailInput = null;
     for (const selector of emailSelectors) {
       const el = document.querySelector(selector);
-      if (el && el.offsetParent !== null) { // Check visibility
+      if (el && el.offsetParent !== null) {
         emailInput = el;
         break;
       }
@@ -106,7 +136,7 @@
     let passwordInput = null;
     for (const selector of passwordSelectors) {
       const el = document.querySelector(selector);
-      if (el && el.offsetParent !== null) { // Check visibility
+      if (el && el.offsetParent !== null) {
         passwordInput = el;
         break;
       }
@@ -130,130 +160,63 @@
 
   /**
    * Handles multi-step login flows (e.g., Google accounts.google.com, Microsoft).
-   * Step 1: Inject email, dispatch input/change events, and click Next.
+   * Step 1: Polls DOM for email input, injects email (auto-appending @gmail.com for Google if missing),
+   * dispatches events, and clicks Next.
    * Step 2: Observe DOM for password field appearance, fill password, and click Next/Submit.
    *
    * @param {{ email?: string, username?: string, password?: string }} credentials
    */
   function handleMultiStepLogin(credentials) {
-    const emailValue = credentials.email || credentials.username || '';
-    const passwordValue = credentials.password || '';
+    updateCachedCredentials(credentials);
 
-    const emailSelectors = [
-      'input[type="email"]',
-      '#identifierId',
-      'input[name="identifier"]',
-      '#login_field',
-      '#user_login',
-      'input[name="login"]',
-      'input[name="username"]',
-      'input[name="email"]',
-      'input[id*="email" i]',
-      'input[id*="user" i]',
-      'input[id*="identifier" i]',
-      'input[type="text"]'
-    ];
-
-    let emailInput = null;
-    for (const selector of emailSelectors) {
-      const el = document.querySelector(selector);
-      if (el && el.offsetParent !== null) {
-        emailInput = el;
-        break;
-      }
+    let rawEmail = credentials.email || credentials.username || cachedCredentials.email || '';
+    // Auto-append @gmail.com if domain is missing on Google Sign-In
+    if (rawEmail && !rawEmail.includes('@') && window.location.hostname.includes('google.com')) {
+      rawEmail += '@gmail.com';
     }
 
-    if (emailInput && emailValue) {
-      // Step 1: Fill Email Input
-      fillInputValue(emailInput, emailValue);
+    const passwordValue = credentials.password || cachedCredentials.password || '';
 
-      // Click "Next" / Submit button for Step 1
-      setTimeout(() => {
-        const nextButtonSelectors = [
-          '#identifierNext button',
-          '#identifierNext',
-          'button[type="submit"]',
-          'input[type="submit"]',
-          'button[id*="next" i]',
-          'button[name*="next" i]',
-          'button[data-primary-action="true"]'
-        ];
+    const isPasswordStep = window.location.pathname.includes('/challenge/pwd') ||
+                           !!document.querySelector('input[type="password"]');
 
-        let nextBtn = null;
-        for (const sel of nextButtonSelectors) {
-          const btn = document.querySelector(sel);
-          if (btn && btn.offsetParent !== null) {
-            nextBtn = btn;
-            break;
-          }
-        }
-
-        if (nextBtn) {
-          clickElement(nextBtn);
-        }
-
-        // Proceed to Step 2: Observe for Password input field
-        observeAndFillPassword(passwordValue);
-      }, 350);
-    } else {
-      // Email already filled or not found; proceed to observe Password field
+    if (isPasswordStep) {
       observeAndFillPassword(passwordValue);
+      return;
     }
-  }
 
-  /**
-   * Step 2: Uses MutationObserver + polling fallback to detect when password field appears in DOM,
-   * fills password, dispatches events, and automatically clicks final Next / Sign-in button.
-   *
-   * @param {string} password
-   */
-  function observeAndFillPassword(password) {
-    if (!password) return;
+    let emailFilled = false;
 
-    const passwordSelectors = [
-      'input[type="password"]',
-      '#password',
-      '#user_password',
-      'input[name="Passwd"]',
-      'input[name="password"]',
-      'input[id*="password" i]',
-      'input[id*="pass" i]'
-    ];
+    function tryFillEmail() {
+      if (emailFilled || !rawEmail) return true;
 
-    let filled = false;
+      const emailSelectors = [
+        'input[type="email"]',
+        '#identifierId',
+        'input[name="identifier"]',
+        '#login_field',
+        '#user_login',
+        'input[name="login"]',
+        'input[name="email"]',
+        'input[name="user"]',
+        'input[id*="email" i]',
+        'input[id*="identifier" i]',
+        'input[id*="user" i]',
+        'input[id*="login" i]'
+      ];
 
-    function tryFillPassword() {
-      if (filled) return true;
+      for (const sel of emailSelectors) {
+        const el = document.querySelector(sel);
+        if (el && el.offsetParent !== null && !el.disabled) {
+          emailFilled = true;
+          fillInputValue(el, rawEmail);
 
-      for (const selector of passwordSelectors) {
-        const passwordInput = document.querySelector(selector);
-        if (passwordInput && passwordInput.offsetParent !== null) {
-          filled = true;
-
-          // Fill Password Input
-          fillInputValue(passwordInput, password);
-
-          // Click final Next / Sign-in button after short delay
-          setTimeout(() => {
-            const finalNextSelectors = [
-              '#passwordNext button',
-              '#passwordNext',
-              '#submitButton',
-              'button[type="submit"]',
-              'input[type="submit"]',
-              'button[id*="submit" i]',
-              'button[id*="next" i]',
-              'button[id*="signin" i]',
-              'button[name*="submit" i]'
-            ];
-
-            for (const sel of finalNextSelectors) {
-              const btn = document.querySelector(sel);
-              if (btn && btn.offsetParent !== null) {
-                clickElement(btn);
-                break;
-              }
+          trackedTimeout(() => {
+            const nextBtn = document.querySelector('#identifierNext button, #identifierNext, button[type="submit"], button[data-primary-action="true"]');
+            if (nextBtn) {
+              clickElement(nextBtn);
             }
+            observeAndFillPassword(passwordValue);
           }, 350);
 
           return true;
@@ -262,59 +225,278 @@
       return false;
     }
 
-    // 1. Immediate Check
-    if (tryFillPassword()) return;
+    // 1. Synchronous attempt (0ms delay)
+    if (tryFillEmail()) return;
 
-    // 2. MutationObserver for DOM changes
-    const observer = new MutationObserver(() => {
-      if (tryFillPassword()) {
-        observer.disconnect();
-        if (pollInterval) clearInterval(pollInterval);
-      }
-    });
-
-    observer.observe(document.body || document.documentElement, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['style', 'class', 'type', 'hidden']
-    });
-
-    // 3. Polling Fallback
+    // 2. High-frequency polling (every 40ms)
     let attempts = 0;
-    const maxAttempts = 30;
-    const pollInterval = setInterval(() => {
-      attempts++;
-      if (tryFillPassword() || attempts >= maxAttempts) {
-        clearInterval(pollInterval);
-        observer.disconnect();
-      }
-    }, 200);
+    const maxAttempts = 100;
+    let observer = null;
 
-    // Timeout safety to clean up listeners
-    setTimeout(() => {
-      observer.disconnect();
+    const cleanup = () => {
       if (pollInterval) clearInterval(pollInterval);
-    }, 10000);
+      if (observer) {
+        observer.disconnect();
+        observer = null;
+      }
+    };
+
+    const pollInterval = trackedInterval(() => {
+      attempts++;
+      if (tryFillEmail() || attempts >= maxAttempts) {
+        cleanup();
+        observeAndFillPassword(passwordValue);
+      }
+    }, 40);
+
+    // 3. MutationObserver for instant DOM insertion reaction
+    if (window.MutationObserver) {
+      observer = createObserver(() => {
+        if (tryFillEmail()) {
+          cleanup();
+        }
+      });
+      observer.observe(document.body || document.documentElement, {
+        childList: true,
+        subtree: true,
+        attributes: true
+      });
+    }
+
+    trackedTimeout(cleanup, 8000);
   }
 
-  // Listen for messages from popup script
-  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if ((request.action === 'AUTOFILL' || request.action === 'AUTOFILL_GMAIL') && request.credentials) {
-      const isGoogle = window.location.hostname.includes('accounts.google.com');
-      const passwordInput = document.querySelector('input[type="password"]');
+  /**
+   * Step 2: Synchronously uses cached password (or parameter) and polls DOM to inject password,
+   * trigger React/Angular events, and click the final Next button without async delays.
+   *
+   * @param {string} [password]
+   */
+  function observeAndFillPassword(password) {
+    try {
+      const targetPassword = password || cachedCredentials.password;
 
-      if (isGoogle || !passwordInput) {
-        handleMultiStepLogin(request.credentials);
-      } else {
-        const bothFilled = fillStandardForm(request.credentials);
-        if (!bothFilled) {
-          handleMultiStepLogin(request.credentials);
-        }
+      if (!targetPassword) {
+        console.warn('[Elyx Vault] Auto-login step 2 waiting for credentials...');
+        return;
       }
 
-      sendResponse({ status: 'success', message: 'Auto-fill sequence initiated.' });
+      const passwordSelectors = [
+        'input[type="password"]',
+        'input[name="Passwd"]',
+        '#password',
+        '#user_password',
+        'input[name="password"]',
+        'input[id*="password" i]',
+        'input[id*="pass" i]'
+      ];
+
+      let filled = false;
+
+      function isElementInteractable(el) {
+        if (!el || el.disabled || el.readOnly) return false;
+        const style = window.getComputedStyle(el);
+        return (
+          style.display !== 'none' &&
+          style.visibility !== 'hidden' &&
+          style.opacity !== '0' &&
+          el.offsetParent !== null
+        );
+      }
+
+      function tryFillPassword() {
+        if (filled) return true;
+
+        try {
+          for (const selector of passwordSelectors) {
+            const passwordInput = document.querySelector(selector);
+            if (passwordInput && isElementInteractable(passwordInput)) {
+              filled = true;
+
+              // Inject password & trigger React/Angular event pipeline instantly
+              fillInputValue(passwordInput, targetPassword);
+
+              // Click final Next / Sign-in button after slight DOM update delay
+              trackedTimeout(() => {
+                const finalNextSelectors = [
+                  '#passwordNext button',
+                  '#passwordNext',
+                  '#submitButton',
+                  'button[type="submit"]',
+                  'input[type="submit"]',
+                  'button[id*="submit" i]',
+                  'button[id*="next" i]',
+                  'button[id*="signin" i]',
+                  'button[name*="submit" i]',
+                  'button[data-primary-action="true"]'
+                ];
+
+                for (const sel of finalNextSelectors) {
+                  const btn = document.querySelector(sel);
+                  if (btn && isElementInteractable(btn)) {
+                    clickElement(btn);
+                    break;
+                  }
+                }
+              }, 400);
+
+              return true;
+            }
+          }
+        } catch (err) {
+          console.error('[Elyx Vault] Error during password field fill attempt:', err);
+        }
+        return false;
+      }
+
+      // 1. Immediate Synchronous Check (0ms delay)
+      if (tryFillPassword()) return;
+
+      // 2. Polling interval (runs every 150ms for up to 8 seconds / 50 attempts)
+      let attempts = 0;
+      const maxAttempts = 50;
+      let observer = null;
+
+      const cleanup = () => {
+        if (pollInterval) clearInterval(pollInterval);
+        if (observer) {
+          observer.disconnect();
+          observer = null;
+        }
+      };
+
+      const pollInterval = trackedInterval(() => {
+        attempts++;
+        if (tryFillPassword() || attempts >= maxAttempts) {
+          cleanup();
+        }
+      }, 150);
+
+      // 3. MutationObserver for responsive SPA DOM mutations
+      if (window.MutationObserver) {
+        observer = createObserver(() => {
+          if (tryFillPassword()) {
+            cleanup();
+          }
+        });
+
+        observer.observe(document.body || document.documentElement, {
+          childList: true,
+          subtree: true,
+          attributes: true,
+          attributeFilter: ['style', 'class', 'type', 'hidden', 'disabled']
+        });
+      }
+
+      // Hard safety timeout after 8 seconds
+      trackedTimeout(cleanup, 8000);
+
+    } catch (error) {
+      console.error('[Elyx Vault] Step 2 Password observe error:', error);
+    }
+  }
+
+  /**
+   * Main entry point to initiate auto-fill sequence based on site type.
+   *
+   * @param {{ email?: string, username?: string, password?: string }} credentials
+   */
+  function triggerAutofillSequence(credentials) {
+    if (!credentials) return;
+    updateCachedCredentials(credentials);
+
+    const isGoogle = window.location.hostname.includes('accounts.google.com');
+    const isPasswordStep = window.location.pathname.includes('/challenge/pwd') ||
+                           !!document.querySelector('input[type="password"]');
+
+    if (isPasswordStep) {
+      observeAndFillPassword(cachedCredentials.password);
+      return;
+    }
+
+    if (isGoogle) {
+      handleMultiStepLogin(credentials);
+    } else {
+      const bothFilled = fillStandardForm(credentials);
+      if (!bothFilled) {
+        handleMultiStepLogin(credentials);
+      }
+    }
+  }
+
+  // 1. Listen for background push messages (from tabUpdated event or popup)
+  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (sender.id !== chrome.runtime.id) return false;
+    if (request.action === 'ELYX_VAULT_LOCKED') { clearCredentials(); sendResponse({status:'success'}); return false; }
+    if ((request.action === 'AUTOFILL' || request.action === 'AUTOFILL_GMAIL' || request.action === 'AUTO_LOGIN') && request.credentials) {
+      updateCachedCredentials(request.credentials);
+      triggerAutofillSequence(request.credentials);
+      sendResponse({ status: 'success', message: 'Auto-fill sequence triggered.' });
     }
     return true;
+  });
+
+  // 2. Query background service worker upon page load for any pending credentials
+  try {
+    chrome.runtime.sendMessage({ action: 'GET_PENDING_CREDENTIALS' }, (response) => {
+      if (!chrome.runtime.lastError && response && response.credentials) {
+        updateCachedCredentials(response.credentials);
+        triggerAutofillSequence(response.credentials);
+      } else if (cachedCredentials.password || cachedCredentials.email) {
+        triggerAutofillSequence(cachedCredentials);
+      }
+    });
+  } catch (e) {
+    if (cachedCredentials.password || cachedCredentials.email) {
+      triggerAutofillSequence(cachedCredentials);
+    }
+  }
+
+  // 4. Immediate execution check on load if page is already at the password challenge screen
+  const isPasswordPage = window.location.pathname.includes('/challenge/pwd') ||
+                         !!document.querySelector('input[type="password"]');
+  if (isPasswordPage && cachedCredentials.password) {
+    observeAndFillPassword(cachedCredentials.password);
+  }
+
+  // 5. Global Bridge Listener for Web-to-Extension Communication (React Dashboard -> Content Script -> Background)
+  const handleLaunchRequest = (payload) => {
+    if (!globalThis.ELYX_SECURITY?.trusted(window.location.href)) return;
+    if (!payload || typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.sendMessage) return;
+    const targetUrl = payload.url || 'https://accounts.google.com/v3/signin/identifier?prompt=select_account&flowName=GlifWebSignIn&flowEntry=AddSession';
+    const credentials = payload.credentials || {
+      email: payload.email || payload.username || '',
+      password: payload.password || ''
+    };
+
+    try {
+      if (!chrome.runtime || !chrome.runtime.id) return;
+      chrome.runtime.sendMessage({
+        action: 'LAUNCH_AND_FILL',
+        payload: {
+          url: targetUrl,
+          credentials: credentials
+        }
+      }, response => {
+        window.dispatchEvent(new CustomEvent('ELYX_LOGIN_RESULT', {detail:{requestId:payload.requestId,status:chrome.runtime.lastError ? 'error' : response?.status}}));
+      });
+    } catch (e) {}
+  };
+
+  window.addEventListener('ELYX_VAULT_LOCKED', () => {
+    clearCredentials();
+    if (globalThis.ELYX_SECURITY?.trusted(location.href)) chrome.runtime.sendMessage({action:'CLEAR_PENDING_CREDENTIALS'});
+  });
+
+  // 5a. Listen for Custom Events
+  window.addEventListener('ELYX_LAUNCH_LOGIN', (e) => {
+    if (e.detail) handleLaunchRequest(e.detail);
+  });
+
+  // 5b. Listen for window.postMessage
+  window.addEventListener('message', (event) => {
+    if (event.origin === window.location.origin && event.source === window && event.data && (event.data.type === 'ELYX_LAUNCH_LOGIN' || event.data.action === 'ELYX_LAUNCH_LOGIN')) {
+      handleLaunchRequest(event.data.payload || event.data.detail);
+    }
   });
 })();

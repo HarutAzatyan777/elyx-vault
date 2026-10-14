@@ -98,8 +98,8 @@ export function MobileHomeScreen({
             <div className={styles.widgetTitle}>Personal Cloud OS</div>
             <p className={styles.widgetSubtitle}>
               {isVaultUnlocked
-                ? 'Zero-Knowledge Vault is decrypted and ready.'
-                : 'Zero-Knowledge Vault is encrypted and locked.'}
+                ? 'Elyx Vault is decrypted and ready.'
+                : 'Elyx Vault is encrypted and locked.'}
             </p>
           </div>
           <div className={styles.widgetActions}>

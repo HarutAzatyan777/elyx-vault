@@ -1,3 +1,4 @@
+import { subscribeShared } from './sharedSubscriptions.js';
 import {
   ref,
   set,
@@ -5,7 +6,6 @@ import {
   update,
   remove,
   onValue,
-  off,
   serverTimestamp,
   onDisconnect,
 } from 'firebase/database';
@@ -29,6 +29,7 @@ export function setupUserPresence(uid, metadata = {}) {
   if (!uid || !isRTDBAvailable()) return () => {};
 
   try {
+    let disposed = false;
     const connectedRef = ref(rtdb, '.info/connected');
     const userPresenceRef = ref(rtdb, `presence/${uid}`);
 
@@ -44,8 +45,9 @@ export function setupUserPresence(uid, metadata = {}) {
           ...metadata,
         })
         .then(() => {
+          if (disposed) return;
           // When connected, mark user as online
-          set(userPresenceRef, {
+          return set(userPresenceRef, {
             state: 'online',
             lastSeen: serverTimestamp(),
             connectedAt: serverTimestamp(),
@@ -58,7 +60,8 @@ export function setupUserPresence(uid, metadata = {}) {
     });
 
     return () => {
-      off(connectedRef);
+      disposed = true;
+      unsubscribe();
       // Mark offline on manual cleanup
       set(userPresenceRef, {
         state: 'offline',
@@ -99,25 +102,18 @@ export function broadcastLiveMusicSync(uid, track, isPlaying) {
   try {
     const liveMusicRef = ref(rtdb, `presence/${uid}/liveMusic`);
     if (!track) {
-      set(liveMusicRef, {
+      return set(liveMusicRef, {
         isPlaying: false,
         track: null,
         updatedAt: serverTimestamp(),
-      });
-      return;
+      }).catch(() => {});
     }
 
-    set(liveMusicRef, {
+    return set(liveMusicRef, {
       isPlaying: Boolean(isPlaying),
-      track: {
-        id: track.id,
-        title: track.title,
-        artist: track.artist,
-        album: track.album || '',
-        coverUrl: track.coverUrl || '',
-      },
+      track: { id: track.id },
       updatedAt: serverTimestamp(),
-    });
+    }).catch(() => {});
   } catch (err) {
     console.warn('[RTDB Music] Live broadcast notice:', err.message);
   }
@@ -138,7 +134,7 @@ export function subscribeLiveMusicSync(uid, onData) {
 /**
  * Listen to Realtime Database live connection state (.info/connected)
  */
-export function subscribeRTDBConnection(onConnectionChange) {
+function subscribeRTDBConnectionSource(onConnectionChange) {
   if (!isRTDBAvailable()) {
     onConnectionChange(false);
     return () => {};
@@ -147,7 +143,7 @@ export function subscribeRTDBConnection(onConnectionChange) {
   const connectedRef = ref(rtdb, '.info/connected');
   return onValue(connectedRef, (snap) => {
     onConnectionChange(snap.val() === true);
-  });
+  }, () => onConnectionChange(false));
 }
 
 /**
@@ -196,3 +192,5 @@ export function subscribeRTDB(path, onData, onError) {
     }
   );
 }
+
+export function subscribeRTDBConnection(onData) { return subscribeShared('rtdb:connection', emit => subscribeRTDBConnectionSource(emit), onData); }

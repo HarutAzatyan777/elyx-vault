@@ -1,5 +1,8 @@
+import { pickPersistedFields, NOTE_FIELDS } from '../utils/persistence.js';
+import { isLegacyCiphertext } from '../utils/securePayload.js';
+import { subscribeShared } from './sharedSubscriptions.js';
 import {
-  addDoc,
+  setDoc,
   collection,
   deleteDoc,
   doc,
@@ -10,7 +13,7 @@ import {
   updateDoc,
   where,
 } from 'firebase/firestore';
-import { db } from '../config/firebase.js';
+import { auth, db } from '../config/firebase.js';
 
 export const DEMO_NOTE_IDS = new Set([
   'starter-welcome',
@@ -48,7 +51,9 @@ export function getLocalNotes(uid) {
     if (raw !== null) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
-        const cleaned = parsed.filter((n) => !isDemoNote(n));
+        const cleaned = parsed.filter(
+          (record) => record && typeof record.id === 'string',
+        );
         if (cleaned.length !== parsed.length) {
           setLocalNotes(uid, cleaned);
         }
@@ -56,7 +61,7 @@ export function getLocalNotes(uid) {
       }
     }
   } catch (err) {
-    console.warn('[Notepad] LocalStorage read failed:', err);
+    console.warn('[Notepad] LocalStorage read failed:');
   }
   return [];
 }
@@ -67,10 +72,14 @@ export function getLocalNotes(uid) {
 export function setLocalNotes(uid, notes) {
   try {
     if (!Array.isArray(notes)) return;
-    const cleaned = notes.filter((n) => !isDemoNote(n));
+    const cleaned = notes
+      .filter((record) => record && typeof record.id === 'string')
+      .map((note) => pickPersistedFields(note, NOTE_FIELDS));
     localStorage.setItem(getStorageKey(uid), JSON.stringify(cleaned));
+    return true;
   } catch (err) {
-    console.warn('[Notepad] LocalStorage write failed:', err);
+    console.warn('[Notepad] Local storage unavailable.');
+    return false;
   }
 }
 
@@ -92,7 +101,7 @@ export async function cleanupDemoNotesFromCloud(uid) {
 /**
  * Subscribe to user notes (Firestore with transparent LocalStorage sync & fallback)
  */
-export function subscribeToNotes(uid, businessId, onData, onError) {
+function subscribeToNotesSource(uid, businessId, onData, onError) {
   const localNotes = getLocalNotes(uid);
   onData(localNotes);
 
@@ -102,26 +111,17 @@ export function subscribeToNotes(uid, businessId, onData, onError) {
 
   try {
     const notesColl = collection(db, 'user_notes');
-    const q = query(
-      notesColl,
-      where('uid', '==', uid)
-    );
+    const q = query(notesColl, where('uid', '==', uid));
 
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        if (snapshot.empty) {
-          setLocalNotes(uid, []);
-          onData([]);
-          return;
-        }
-
         const remoteNotes = snapshot.docs
           .map((docSnap) => ({
-            id: docSnap.id,
             ...docSnap.data(),
+            id: docSnap.id,
           }))
-          .filter((n) => !isDemoNote(n));
+          .filter((record) => record && typeof record.id === 'string');
 
         // Sort: pinned first, then updatedAt desc
         remoteNotes.sort((a, b) => {
@@ -131,14 +131,24 @@ export function subscribeToNotes(uid, businessId, onData, onError) {
         });
 
         // Sync with local storage
-        setLocalNotes(uid, remoteNotes);
-        onData(remoteNotes);
+        const pending = getLocalNotes(uid).filter((note) => note._pendingCloud);
+        const merged = [
+          ...pending,
+          ...remoteNotes.filter(
+            (note) => !pending.some((local) => local.id === note.id),
+          ),
+        ];
+        setLocalNotes(uid, merged);
+        onData(merged);
       },
       (error) => {
-        console.warn('[Notepad Firestore] Using LocalStorage fallback:', error.message);
+        console.warn(
+          '[Notepad Firestore] Using LocalStorage fallback:',
+          error.message,
+        );
         if (onError) onError(error);
-        onData(getLocalNotes(uid));
-      }
+        onData(error.code === 'permission-denied' ? [] : getLocalNotes(uid));
+      },
     );
 
     return unsubscribe;
@@ -153,13 +163,18 @@ export function subscribeToNotes(uid, businessId, onData, onError) {
  * Save or update a note
  */
 export async function saveNoteToStorage({ note, uid, businessId }) {
+  if (!uid || uid !== auth.currentUser?.uid)
+    throw new Error('Sign in to save notes.');
+  if (note.isEncrypted && !isLegacyCiphertext(note.content))
+    throw new Error('Encrypted notes require ciphertext.');
   const noteId = note.id;
   const now = new Date().toISOString();
   const updatedNote = {
-    ...note,
+    ...pickPersistedFields(note, NOTE_FIELDS),
+    _pendingCloud: true,
     updatedAt: now,
     uid: uid || 'local',
-    businessId: businessId || null,
+    businessId: note.businessId ?? businessId ?? null,
   };
 
   // 1. Update in LocalStorage first for instant UI response
@@ -172,32 +187,32 @@ export async function saveNoteToStorage({ note, uid, businessId }) {
   } else {
     nextLocal = [updatedNote, ...currentLocal];
   }
-  setLocalNotes(uid, nextLocal);
+  const cachedLocally = setLocalNotes(uid, nextLocal);
 
   // 2. Try Firestore if online and uid available
   if (uid) {
     try {
       const noteDocRef = doc(db, 'user_notes', noteId);
-      await updateDoc(noteDocRef, {
-        title: updatedNote.title,
-        content: updatedNote.content,
-        category: updatedNote.category,
-        tags: updatedNote.tags || [],
-        isPinned: Boolean(updatedNote.isPinned),
-        isEncrypted: Boolean(updatedNote.isEncrypted),
-        updatedAt: now,
-      }).catch(async (err) => {
-        // If doc doesn't exist, try setDoc or addDoc
-        if (err.code === 'not-found') {
-          await addDoc(collection(db, 'user_notes'), {
-            ...updatedNote,
-            createdAt: updatedNote.createdAt || now,
-          });
-        }
-      });
+      const { _pendingCloud, ...cloudNote } = updatedNote;
+      await setDoc(
+        noteDocRef,
+        { ...cloudNote, createdAt: updatedNote.createdAt || now },
+        { merge: true },
+      );
+      updatedNote._pendingCloud = false;
+      setLocalNotes(
+        uid,
+        getLocalNotes(uid).map((current) =>
+          current.id === noteId ? updatedNote : current,
+        ),
+      );
     } catch (e) {
       // Non-fatal, local storage already contains it
-      console.warn('[Notepad] Firestore sync notice:', e.message);
+      throw new Error(
+        cachedLocally
+          ? 'The note is cached locally but cloud saving failed. Reconnect and retry.'
+          : 'Saving failed. Storage is unavailable; reconnect and retry.',
+      );
     }
   }
 
@@ -230,13 +245,16 @@ export async function deleteNoteFromStorage(noteId, uid) {
  */
 export function downloadNoteFile(note, format = 'markdown') {
   const extension = format === 'markdown' ? 'md' : 'txt';
-  const cleanTitle = (note.title || 'untitled-note')
-    .replace(/[^\w\s\u0531-\u058F-]/gi, '')
-    .trim()
-    .replace(/\s+/g, '_') || 'note';
+  const cleanTitle =
+    (note.title || 'untitled-note')
+      .replace(/[^\w\s\u0531-\u058F-]/gi, '')
+      .trim()
+      .replace(/\s+/g, '_') || 'note';
   const filename = `${cleanTitle}.${extension}`;
 
-  const blob = new Blob([note.content || ''], { type: 'text/plain;charset=utf-8' });
+  const blob = new Blob([note.content || ''], {
+    type: 'text/plain;charset=utf-8',
+  });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
@@ -270,4 +288,17 @@ export async function copyTextToClipboard(text) {
     document.body.removeChild(textarea);
     return false;
   }
+}
+
+export function subscribeToNotes(uid, businessId, onData, onError) {
+  if (!uid) {
+    onData([]);
+    return () => {};
+  }
+  return subscribeShared(
+    'subscribeToNotes:' + uid,
+    (emit, fail) => subscribeToNotesSource(uid, businessId, emit, fail),
+    onData,
+    onError,
+  );
 }

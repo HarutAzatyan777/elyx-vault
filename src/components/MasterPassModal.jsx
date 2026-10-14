@@ -4,21 +4,20 @@ import styles from './MasterPassModal.module.css';
 /**
  * Modal dialog prompting the user for their master password to decrypt vault contents.
  *
- * @param {{ onSubmit: (password: string, remember: boolean) => void }} props
+ * @param {{ onSubmit: (password: string) => void }} props
  */
 export const MasterPassModal = ({ onSubmit }) => {
   const [password, setPassword] = useState('');
-  const [remember, setRemember] = useState(true);
   const [error, setError] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!password.trim()) {
       setError('Please enter your master password.');
       return;
     }
     setError('');
-    onSubmit(password, remember);
+    try { await onSubmit(password); setPassword(''); } catch { setError('Unlock failed. Check your password and connection.'); }
   };
 
   return (
@@ -41,7 +40,7 @@ export const MasterPassModal = ({ onSubmit }) => {
           </svg>
           <h2 className={styles.title}>Unlock Vault</h2>
           <p className={styles.subtitle}>
-            Enter your master password to decrypt your zero-knowledge vault.
+            Enter your master password to decrypt your encrypted vault.
           </p>
         </div>
 
@@ -49,6 +48,7 @@ export const MasterPassModal = ({ onSubmit }) => {
           <div className={styles.field}>
             <label className={styles.label}>Master Password / Encryption PIN</label>
             <input
+              aria-label="Master password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -59,18 +59,7 @@ export const MasterPassModal = ({ onSubmit }) => {
             {error && <p className={styles.errorText}>{error}</p>}
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '4px 0 12px 0' }}>
-            <input
-              type="checkbox"
-              id="rememberPass"
-              checked={remember}
-              onChange={(e) => setRemember(e.target.checked)}
-              style={{ cursor: 'pointer', width: '16px', height: '16px' }}
-            />
-            <label htmlFor="rememberPass" style={{ color: '#9ca3af', fontSize: '0.85rem', cursor: 'pointer' }}>
-              Remember key in this browser session (don't ask again)
-            </label>
-          </div>
+          <p className={styles.subtitle}>Your key stays in memory until you lock the vault or reload.</p>
 
           <button type="submit" className={styles.button}>
             Unlock Vault

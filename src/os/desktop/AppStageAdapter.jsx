@@ -1,19 +1,21 @@
-import React, { Suspense } from 'react';
+import { canUserLaunchApp } from '../registry/appRegistry.js';
+import { isActiveAccess } from '../../utils/access.js';
+import React, { lazy, Suspense } from 'react';
 import { getAppById } from '../registry/appRegistry.js';
 import { MasterPassModal } from '../../components/MasterPassModal.jsx';
 import styles from './AppStageAdapter.module.css';
 
 // Direct module imports
-import DailyWorkspace from '../../components/daily-workspace/DailyWorkspace.jsx';
-import Notepad from '../../components/notepad/Notepad.jsx';
-import MediaVault from '../../components/media/MediaVault.jsx';
-import MusicVault from '../../components/music/MusicVault.jsx';
-import MinecraftVault from '../../components/MinecraftVault/MinecraftVault.jsx';
-import UserManagement from '../../components/UserManagement.jsx';
-import DeviceList from '../../components/remote/DeviceList.jsx';
-import RemoteTerminal from '../../components/remote/RemoteTerminal.jsx';
-import AddProject from '../../components/AddProject.jsx';
-import { ProjectCard } from '../../components/ProjectCard.jsx';
+const DailyWorkspace = lazy(() => import('../../components/daily-workspace/DailyWorkspace.jsx'));
+const Notepad = lazy(() => import('../../components/notepad/Notepad.jsx'));
+const MediaVault = lazy(() => import('../../components/media/MediaVault.jsx'));
+const MusicVault = lazy(() => import('../../components/music/MusicVault.jsx'));
+const MinecraftVault = lazy(() => import('../../components/MinecraftVault/MinecraftVault.jsx'));
+const UserManagement = lazy(() => import('../../components/UserManagement.jsx'));
+const DeviceList = lazy(() => import('../../components/remote/DeviceList.jsx'));
+const RemoteTerminal = lazy(() => import('../../components/remote/RemoteTerminal.jsx'));
+const AddProject = lazy(() => import('../../components/AddProject.jsx'));
+const ProjectCard = lazy(() => import('../../components/ProjectCard.jsx'));
 
 export function AppStageAdapter({
   activeAppId,
@@ -37,7 +39,7 @@ export function AppStageAdapter({
   if (!activeAppId) return null;
 
   const app = getAppById(activeAppId);
-  if (!app) return null;
+  if (!app || !isActiveAccess(access) || !canUserLaunchApp(app, access.role)) return <p role="alert">Application unavailable or access denied.</p>;
 
   const requiresPass = app.requiresMasterPassword;
   const isLocked = requiresPass && !masterPassword;
@@ -50,7 +52,7 @@ export function AppStageAdapter({
             <div className={styles.lockedIcon}>🔒</div>
             <h3 className={styles.lockedTitle}>{app.name} is Protected</h3>
             <p className={styles.lockedSubtitle}>
-              Please enter your zero-knowledge master password to decrypt this vault module.
+              Please enter your vault master password to decrypt this vault module.
             </p>
             <MasterPassModal onSubmit={onUnlockVault} />
           </div>

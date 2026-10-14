@@ -1,3 +1,4 @@
+import { sanitizeUrl } from '../../utils/workspaceValidation.js';
 import React, { useState, useRef } from 'react';
 import {
   MUSIC_GENRES,
@@ -5,7 +6,7 @@ import {
   formatAudioDuration,
   formatBytes,
 } from '../../services/musicService';
-import { encryptData } from '../../utils/crypto';
+import { encryptRequired } from '../../utils/securePayload.js';
 import styles from './AddTrackModal.module.css';
 
 export const AddTrackModal = ({
@@ -118,9 +119,10 @@ export const AddTrackModal = ({
 
       setIsSubmitting(true);
       try {
-        let finalUrl = audioUrl.trim();
+        let finalUrl = sanitizeUrl(audioUrl);
+        if (!finalUrl) throw new Error('Use an HTTP or HTTPS audio URL.');
         if (isEncrypted && masterPassword) {
-          const enc = encryptData(finalUrl, masterPassword);
+          const enc = encryptRequired(finalUrl, masterPassword);
           if (enc) finalUrl = enc;
         }
 
@@ -168,7 +170,7 @@ export const AddTrackModal = ({
         let savedUrl = item.blobUrl || '';
 
         if (isEncrypted && masterPassword) {
-          const enc = encryptData(item.dataUrl, masterPassword);
+          const enc = encryptRequired(item.dataUrl, masterPassword);
           if (enc) savedUrl = enc;
         }
 
@@ -470,7 +472,7 @@ export const AddTrackModal = ({
                 onChange={(e) => setIsEncrypted(e.target.checked)}
               />
               <span className={styles.encryptText}>
-                🔒 Գաղտնագրել Master Password-ով (Zero-Knowledge)
+                🔒 Գաղտնագրել Master Password-ով (Client-side encryption)
               </span>
             </label>
             <span className={styles.encryptSub}>

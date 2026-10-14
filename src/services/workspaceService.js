@@ -1,3 +1,4 @@
+import { subscribeShared } from './sharedSubscriptions.js';
 import {
   addDoc,
   collection,
@@ -123,8 +124,8 @@ export function subscribeToPresets(uid, onData, onError) {
     q,
     (snapshot) => {
       const presets = snapshot.docs.map((docSnap) => ({
-        id: docSnap.id,
         ...docSnap.data(),
+            id: docSnap.id,
       }));
       onData(presets);
     },
@@ -146,8 +147,8 @@ export function subscribeToLinks(uid, onData, onError) {
     q,
     (snapshot) => {
       const links = snapshot.docs.map((docSnap) => ({
-        id: docSnap.id,
         ...docSnap.data(),
+            id: docSnap.id,
       }));
       onData(links);
     },
@@ -171,8 +172,8 @@ export function subscribeToActivity(uid, onData, onError) {
     q,
     (snapshot) => {
       const activities = snapshot.docs.map((docSnap) => ({
-        id: docSnap.id,
         ...docSnap.data(),
+            id: docSnap.id,
       }));
       onData(activities);
     },
@@ -183,7 +184,7 @@ export function subscribeToActivity(uid, onData, onError) {
 /**
  * Subscribe to user's active workspace session
  */
-export function subscribeToActiveSession(uid, onData, onError) {
+function subscribeToActiveSessionSource(uid, onData, onError) {
   if (!uid) return () => {};
   const q = query(
     collection(db, 'workspace_sessions'),
@@ -487,3 +488,5 @@ export function formatDuration(totalSeconds) {
 
   return parts.join(' ');
 }
+
+export function subscribeToActiveSession(uid, onData, onError) { if (!uid) { onData(null); return () => {}; } return subscribeShared('session:' + uid, (emit, fail) => subscribeToActiveSessionSource(uid, emit, fail), onData, onError); }

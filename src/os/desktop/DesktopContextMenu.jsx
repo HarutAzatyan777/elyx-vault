@@ -191,7 +191,7 @@ export function DesktopContextMenu({
           }}
         >
           <span className={styles.itemIcon}>🔒</span>
-          <span className={styles.itemText}>Lock Vault (Zero-Knowledge)</span>
+          <span className={styles.itemText}>Lock Vault (Client-side encryption)</span>
         </button>
       ) : (
         <button

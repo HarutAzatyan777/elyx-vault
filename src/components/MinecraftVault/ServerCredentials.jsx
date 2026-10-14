@@ -1,8 +1,9 @@
+import { encryptRequired } from '../../utils/securePayload.js';
 import React, { useState } from 'react';
 import { collection, addDoc, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { useAuth } from '../../hooks/useAuth.jsx';
-import { encryptData, decryptData } from '../../utils/crypto';
+import { decryptData } from '../../utils/crypto';
 import styles from './MinecraftVault.module.css';
 
 export const ServerCredentials = ({ items, masterPassword, onRefresh }) => {
@@ -54,7 +55,7 @@ export const ServerCredentials = ({ items, masterPassword, onRefresh }) => {
         notes: notes.trim(),
       });
 
-      const encryptedData = encryptData(payload, masterPassword);
+      const encryptedData = encryptRequired(payload, masterPassword);
 
       await addDoc(collection(db, 'minecraft_vault'), {
         businessId: access.businessId,

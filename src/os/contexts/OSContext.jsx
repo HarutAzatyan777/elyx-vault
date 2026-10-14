@@ -1,16 +1,27 @@
-import React, { createContext, useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  enqueueNotification,
+  markNotificationsRead,
+} from '../notifications/notificationState.js';
+import { useAuth } from '../../hooks/useAuth.jsx';
+import React, {
+  createContext,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   getOSFeatureFlags,
   isOSModeEnabled,
   setOSModeEnabled,
 } from '../config/featureFlags.js';
 import {
-  DEFAULT_OS_SETTINGS,
   loadOSSettings,
   saveOSSettings,
+  normalizeSettings,
 } from '../settings/settingsConfig.js';
 import {
-  DEFAULT_WORKSPACES,
   loadActiveWorkspace,
   loadWorkspaces,
   saveActiveWorkspace,
@@ -21,16 +32,28 @@ import {
 export const OSContext = createContext(null);
 
 export const OSProvider = ({ children }) => {
+  const { user } = useAuth();
+  useEffect(() => {
+    setNotifications([]);
+  }, [user?.uid]);
+  useEffect(() => {
+    const clear = () => setNotifications([]);
+    window.addEventListener('elyx:vault-locked', clear);
+    return () => window.removeEventListener('elyx:vault-locked', clear);
+  }, []);
   // Feature flag & OS mode state
   const [isOSMode, setIsOSModeState] = useState(isOSModeEnabled);
   const [featureFlags, setFeatureFlags] = useState(getOSFeatureFlags);
 
   // Settings & appearance
   const [settings, setSettingsState] = useState(loadOSSettings);
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
 
   // Virtual Workspaces (GNOME Shell inspired)
   const [workspaces, setWorkspaces] = useState(loadWorkspaces);
-  const [activeWorkspace, setActiveWorkspaceState] = useState(loadActiveWorkspace);
+  const [activeWorkspace, setActiveWorkspaceState] =
+    useState(loadActiveWorkspace);
   const [workspaceMode, setWorkspaceMode] = useState(WORKSPACE_MODES.DESKTOP);
 
   // Launcher state (Spotlight / App Grid)
@@ -73,12 +96,34 @@ export const OSProvider = ({ children }) => {
   }, [isOSMode, setOSMode]);
 
   const updateSettings = useCallback((partial) => {
-    setSettingsState((prev) => {
-      const next = { ...prev, ...partial };
-      saveOSSettings(next);
-      return next;
-    });
+    const next = normalizeSettings({ ...settingsRef.current, ...partial });
+    settingsRef.current = next;
+    saveOSSettings(next);
+    setSettingsState(next);
+    window.dispatchEvent(
+      new CustomEvent('elyx:settings-changed', { detail: next }),
+    );
   }, []);
+
+  useEffect(() => {
+    const sync = (event) =>
+      setSettingsState(normalizeSettings(event.detail || loadOSSettings()));
+    window.addEventListener('elyx:settings-changed', sync);
+    window.addEventListener('storage', sync);
+    return () => {
+      window.removeEventListener('elyx:settings-changed', sync);
+      window.removeEventListener('storage', sync);
+    };
+  }, []);
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty('--elyx-accent-primary', settings.accentColor);
+    root.style.setProperty('--accent', settings.accentColor);
+    root.dataset.reducedMotion = String(
+      settings.reducedMotion || !settings.animationsEnabled,
+    );
+    root.dataset.desktopMode = settings.desktopMode;
+  }, [settings]);
 
   // Workspace Operations
   const switchWorkspace = useCallback((workspaceId) => {
@@ -86,25 +131,30 @@ export const OSProvider = ({ children }) => {
     saveActiveWorkspace(workspaceId);
   }, []);
 
-  const createWorkspace = useCallback((name) => {
-    setWorkspaces((prev) => {
-      const newId = Date.now();
-      const newWs = {
-        id: newId,
-        name: name || `Workspace ${prev.length + 1}`,
-        icon: 'monitor',
-      };
-      const updated = [...prev, newWs];
-      saveWorkspaces(updated);
-      switchWorkspace(newId);
-      return updated;
-    });
-  }, [switchWorkspace]);
+  const createWorkspace = useCallback(
+    (name) => {
+      setWorkspaces((prev) => {
+        const newId = Date.now();
+        const newWs = {
+          id: newId,
+          name: name || `Workspace ${prev.length + 1}`,
+          icon: 'monitor',
+        };
+        const updated = [...prev, newWs];
+        saveWorkspaces(updated);
+        switchWorkspace(newId);
+        return updated;
+      });
+    },
+    [switchWorkspace],
+  );
 
   const renameWorkspace = useCallback((id, newName) => {
     if (!newName?.trim()) return;
     setWorkspaces((prev) => {
-      const updated = prev.map((ws) => (ws.id === id ? { ...ws, name: newName.trim() } : ws));
+      const updated = prev.map((ws) =>
+        ws.id === id ? { ...ws, name: newName.trim() } : ws,
+      );
       saveWorkspaces(updated);
       return updated;
     });
@@ -129,45 +179,48 @@ export const OSProvider = ({ children }) => {
         return updated;
       });
     },
-    [activeWorkspace, switchWorkspace]
+    [activeWorkspace, switchWorkspace],
   );
 
-  const openOverview = useCallback(() => setWorkspaceMode(WORKSPACE_MODES.OVERVIEW), []);
-  const closeOverview = useCallback(() => setWorkspaceMode(WORKSPACE_MODES.DESKTOP), []);
+  const openOverview = useCallback(
+    () => setWorkspaceMode(WORKSPACE_MODES.OVERVIEW),
+    [],
+  );
+  const closeOverview = useCallback(
+    () => setWorkspaceMode(WORKSPACE_MODES.DESKTOP),
+    [],
+  );
   const toggleOverview = useCallback(
     () =>
       setWorkspaceMode((prev) =>
-        prev === WORKSPACE_MODES.OVERVIEW ? WORKSPACE_MODES.DESKTOP : WORKSPACE_MODES.OVERVIEW
+        prev === WORKSPACE_MODES.OVERVIEW
+          ? WORKSPACE_MODES.DESKTOP
+          : WORKSPACE_MODES.OVERVIEW,
       ),
-    []
+    [],
   );
 
   const openLauncher = useCallback(() => setIsLauncherOpen(true), []);
   const closeLauncher = useCallback(() => setIsLauncherOpen(false), []);
-  const toggleLauncher = useCallback(() => setIsLauncherOpen((prev) => !prev), []);
+  const toggleLauncher = useCallback(
+    () => setIsLauncherOpen((prev) => !prev),
+    [],
+  );
 
   const addNotification = useCallback((notification) => {
-    const id = notification.id || `notif_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-    const newNotif = {
-      id,
-      timestamp: Date.now(),
-      type: notification.type || 'info',
-      title: notification.title || 'System Notification',
-      message: notification.message || '',
-      priority: notification.priority || 'normal',
-      ...notification,
-    };
-
-    setNotifications((prev) => [newNotif, ...prev.slice(0, 7)]);
-
-    if (notification.autoDismiss !== false) {
-      setTimeout(() => {
-        setNotifications((current) => current.filter((item) => item.id !== id));
-      }, notification.duration || 5000);
-    }
-
+    const prefs = settingsRef.current;
+    const id =
+      notification.id ||
+      `notif_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    setNotifications((prev) =>
+      enqueueNotification(prev, { ...notification, id }, prefs),
+    );
     return id;
   }, []);
+  const markNotificationRead = useCallback(
+    (id) => setNotifications((prev) => markNotificationsRead(prev, id)),
+    [],
+  );
 
   const removeNotification = useCallback((id) => {
     setNotifications((prev) => prev.filter((item) => item.id !== id));
@@ -205,6 +258,7 @@ export const OSProvider = ({ children }) => {
       addNotification,
       removeNotification,
       clearAllNotifications,
+      markNotificationRead,
     }),
     [
       isOSMode,
@@ -231,7 +285,8 @@ export const OSProvider = ({ children }) => {
       addNotification,
       removeNotification,
       clearAllNotifications,
-    ]
+      markNotificationRead,
+    ],
   );
 
   return <OSContext.Provider value={value}>{children}</OSContext.Provider>;

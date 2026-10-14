@@ -1,3 +1,5 @@
+import { randomBytes } from 'node:crypto';
+import { authorizeFirebaseRequest } from './auth/authorizeFirebase.js';
 import express from 'express';
 import http from 'http';
 import { WebSocketServer } from 'ws';
@@ -7,13 +9,52 @@ import path from 'path';
 import { logger } from './utils/logger.js';
 import { deviceIdentity } from './devices/deviceIdentity.js';
 import { rateLimiter } from './security/rateLimiter.js';
-import { verifySessionToken, generateSessionToken } from './auth/tokenVerifier.js';
+import {
+  verifySessionToken,
+  generateSessionToken,
+} from './auth/tokenVerifier.js';
 import { ptyManager } from './terminal/ptyManager.js';
 
 export function createAgentServer(config = {}) {
   const app = express();
-  app.use(express.json());
-  app.use(cors({ origin: '*' }));
+  const allowedOrigins = config.allowedOrigins || [];
+  const authorize =
+    config.authorizeRequest ||
+    ((token, record, device) =>
+      authorizeFirebaseRequest(
+        token,
+        record,
+        device,
+        config.authorizedUserIds || [],
+      ));
+  app.use(express.json({ limit: '16kb' }));
+  app.use(
+    cors({
+      origin: (origin, callback) =>
+        callback(null, !origin || allowedOrigins.includes(origin)),
+    }),
+  );
+  const authenticate = async (req, res, next) => {
+    if (req.headers.origin && !allowedOrigins.includes(req.headers.origin))
+      return res.status(403).json({ error: 'Origin denied' });
+    if (rateLimiter.isRateLimited(req.socket.remoteAddress || 'unknown'))
+      return res.status(429).json({ error: 'Too many requests' });
+    try {
+      const token = req.headers.authorization?.match(/^Bearer (.+)$/)?.[1];
+      req.identity = await authorize(
+        token,
+        req.body?.deviceRecordId || req.headers['x-elyx-device-id'],
+        deviceIdentity.getIdentity().deviceId,
+      );
+      next();
+    } catch {
+      res
+        .status(403)
+        .json({
+          error: 'Firebase authentication and device authorization required',
+        });
+    }
+  };
 
   const port = config.port || process.env.PORT || 9090;
   const allowedDirectories = config.allowedDirectories || [
@@ -47,7 +88,7 @@ export function createAgentServer(config = {}) {
   });
 
   // 2. Allowed directories whitelist for frontend selection
-  app.get('/api/directories', (req, res) => {
+  app.get('/api/directories', authenticate, (req, res) => {
     res.json({
       directories: allowedDirectories.map((dirPath) => {
         const exists = fs.existsSync(dirPath);
@@ -62,8 +103,8 @@ export function createAgentServer(config = {}) {
   });
 
   // 3. Initiate Enrollment Challenge
-  app.post('/api/enroll/challenge', (req, res) => {
-    const challenge = `chal_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  app.post('/api/enroll/challenge', authenticate, (req, res) => {
+    const challenge = randomBytes(32).toString('hex');
     activeChallenges.set(challenge, {
       createdAt: Date.now(),
       expiresAt: Date.now() + 5 * 60 * 1000, // 5 minutes
@@ -78,26 +119,14 @@ export function createAgentServer(config = {}) {
   });
 
   // 4. Request Short-Lived Session Auth Token
-  app.post('/api/auth/token', (req, res) => {
-    const { uid, deviceId, userEmail } = req.body;
-    const currentDevice = deviceIdentity.getIdentity();
-
-    if (deviceId && deviceId !== currentDevice.deviceId) {
-      return res.status(403).json({ error: 'Device ID mismatch' });
-    }
-
-    const token = generateSessionToken({
-      uid: uid || 'anonymous_user',
-      deviceId: currentDevice.deviceId,
-      userEmail: userEmail || '',
-    });
-
-    logger.securityAudit('SESSION_TOKEN_ISSUED', { uid, deviceId: currentDevice.deviceId });
+  app.post('/api/auth/token', authenticate, (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    const token = generateSessionToken(req.identity);
     res.json({
       status: 'success',
       token,
-      expiresIn: '4h',
-      deviceId: currentDevice.deviceId,
+      expiresIn: '5m',
+      deviceId: req.identity.deviceId,
     });
   });
 
@@ -119,14 +148,16 @@ export function createAgentServer(config = {}) {
       return;
     }
 
-    if (!rateLimiter.validateOrigin(origin, config.allowedOrigins)) {
+    if (!rateLimiter.validateOrigin(origin, allowedOrigins)) {
       socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
       socket.destroy();
       return;
     }
 
     if (ptyManager.getActiveSessionsCount() >= maxConcurrentSessions) {
-      logger.warn('Max concurrent sessions reached. Rejecting connection', { ip });
+      logger.warn('Max concurrent sessions reached. Rejecting connection', {
+        ip,
+      });
       socket.write('HTTP/1.1 503 Service Unavailable\r\n\r\n');
       socket.destroy();
       return;
@@ -139,26 +170,38 @@ export function createAgentServer(config = {}) {
 
   wss.on('connection', (ws, request) => {
     const urlParams = new URLSearchParams(request.url.replace(/^[^?]*\?/, ''));
-    const token = urlParams.get('token');
-    const requestedCwd = urlParams.get('cwd') || allowedDirectories[0] || process.cwd();
+    const protocols = (request.headers['sec-websocket-protocol'] || '')
+      .split(',')
+      .map((value) => value.trim());
+    const token = protocols[0] === 'elyx-terminal' ? protocols[1] : null;
+    const requestedCwd =
+      urlParams.get('cwd') || allowedDirectories[0] || process.cwd();
     const cols = parseInt(urlParams.get('cols') || '80', 10);
     const rows = parseInt(urlParams.get('rows') || '24', 10);
 
     // Verify authentication token
-    const authResult = verifySessionToken(token);
+    const authResult = verifySessionToken(
+      token,
+      undefined,
+      deviceIdentity.getIdentity().deviceId,
+    );
     if (!authResult.valid) {
-      logger.warn('WebSocket connection rejected: invalid token', { error: authResult.error });
+      logger.warn('WebSocket connection rejected: invalid token', {
+        error: authResult.error,
+      });
       ws.send(JSON.stringify({ type: 'error', message: authResult.error }));
       ws.close(4001, 'Unauthorized');
       return;
     }
 
     const sessionId = `sess_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    logger.info('WebSocket client connected', { sessionId, uid: authResult.payload.uid });
+    logger.info('WebSocket client connected', {
+      sessionId,
+      uid: authResult.payload.uid,
+    });
 
-    let sessionObj;
     try {
-      sessionObj = ptyManager.createSession({
+      ptyManager.createSession({
         sessionId,
         cwd: requestedCwd,
         cols,
@@ -167,12 +210,14 @@ export function createAgentServer(config = {}) {
         allowedDirectories,
       });
 
-      ws.send(JSON.stringify({
-        type: 'connected',
-        sessionId,
-        deviceId: deviceIdentity.getIdentity().deviceId,
-        cwd: requestedCwd,
-      }));
+      ws.send(
+        JSON.stringify({
+          type: 'connected',
+          sessionId,
+          deviceId: deviceIdentity.getIdentity().deviceId,
+          cwd: requestedCwd,
+        }),
+      );
     } catch (err) {
       ws.send(JSON.stringify({ type: 'error', message: err.message }));
       ws.close(1011, 'Internal Error');
@@ -207,8 +252,18 @@ export function createAgentServer(config = {}) {
       }
     });
 
+    const expiration = setTimeout(
+      () => ws.close(4001, 'Session expired; reconnect to verify access'),
+      Math.max(0, authResult.payload.exp * 1000 - Date.now()),
+    );
+    expiration.unref?.();
     ws.on('close', (code, reason) => {
-      logger.info('WebSocket client disconnected', { sessionId, code, reason: reason.toString() });
+      clearTimeout(expiration);
+      logger.info('WebSocket client disconnected', {
+        sessionId,
+        code,
+        reason: reason.toString(),
+      });
       ptyManager.closeSession(sessionId, 'WebSocket closed');
     });
 

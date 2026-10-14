@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   formatDuration,
+  getMediaBlob,
   MEDIA_CATEGORIES,
   downloadMediaFile,
 } from '../../services/mediaService';
@@ -13,7 +14,29 @@ export const MediaCard = ({
   onDelete,
   masterPassword,
 }) => {
-  const isLocked = item.isEncrypted && !masterPassword;
+  const [localPreview, setLocalPreview] = useState('');
+  useEffect(() => {
+    let active = true,
+      objectUrl;
+    setLocalPreview('');
+    if (
+      !item.isEncrypted &&
+      !item.storagePath &&
+      !/^https?:/.test(item.url || '')
+    )
+      getMediaBlob(item.id).then((value) => {
+        if (!active || !value) return;
+        if (value instanceof Blob) {
+          objectUrl = URL.createObjectURL(value);
+          setLocalPreview(objectUrl);
+        } else setLocalPreview(value);
+      });
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [item.id, item.url, item.storagePath, item.isEncrypted]);
+  const isLocked = Boolean(item.isEncrypted);
   const categoryMeta = MEDIA_CATEGORIES.find((c) => c.id === item.category);
 
   const handleFavoriteClick = (e) => {
@@ -55,15 +78,20 @@ export const MediaCard = ({
               />
             ) : (
               <video
-                src={item.url}
+                src={localPreview || item.url}
                 className={styles.thumbImg}
                 muted
-                preload="metadata"
+                preload="none"
               />
             )}
             <div className={styles.playOverlay}>
               <div className={styles.playIconCircle}>
-                <svg fill="currentColor" viewBox="0 0 24 24" width="20" height="20">
+                <svg
+                  fill="currentColor"
+                  viewBox="0 0 24 24"
+                  width="20"
+                  height="20"
+                >
                   <path d="M8 5v14l11-7z" />
                 </svg>
               </div>
@@ -77,7 +105,7 @@ export const MediaCard = ({
           </div>
         ) : (
           <img
-            src={item.thumbnailUrl || item.url}
+            src={localPreview || item.thumbnailUrl || item.url}
             alt={item.title}
             className={styles.thumbImg}
             loading="lazy"
@@ -97,7 +125,10 @@ export const MediaCard = ({
         {/* Type Badge Top Left */}
         <div className={styles.typeBadge}>
           {item.type === 'video' ? '🎥 VIDEO' : '🖼️ PHOTO'}
-          {(item.isCloudSynced || item.storagePath || (typeof item.url === 'string' && item.url.includes('firebasestorage.googleapis.com'))) && (
+          {(item.isCloudSynced ||
+            item.storagePath ||
+            (typeof item.url === 'string' &&
+              item.url.includes('firebasestorage.googleapis.com'))) && (
             <span title="Պահպանված է Firebase Cloud Storage-ում"> ☁️</span>
           )}
         </div>
@@ -111,8 +142,19 @@ export const MediaCard = ({
               onClick={handleDownloadClick}
               title="Download file"
             >
-              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="14" height="14">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              <svg
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                width="14"
+                height="14"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                />
               </svg>
             </button>
           )}
@@ -123,8 +165,19 @@ export const MediaCard = ({
             onClick={handleDeleteClick}
             title="Delete item"
           >
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="14" height="14">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            <svg
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              width="14"
+              height="14"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+              />
             </svg>
           </button>
         </div>

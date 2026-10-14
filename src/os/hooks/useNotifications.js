@@ -6,7 +6,7 @@ import { NOTIFICATION_TYPES } from '../notifications/types.js';
  * Hook providing ergonomic helper methods to trigger OS toasts and notifications.
  */
 export const useNotifications = () => {
-  const { notifications, addNotification, removeNotification, clearAllNotifications } = useOS();
+  const { notifications, addNotification, removeNotification, clearAllNotifications, markNotificationRead } = useOS();
 
   const notifyInfo = useCallback(
     (title, message, options = {}) =>
@@ -66,6 +66,8 @@ export const useNotifications = () => {
 
   return {
     notifications,
+    unreadCount: notifications.filter(n => !n.read).length,
+    markRead: markNotificationRead,
     notify: addNotification,
     notifyInfo,
     notifySuccess,

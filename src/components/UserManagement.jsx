@@ -4,6 +4,8 @@ import {
   deleteDoc,
   doc,
   onSnapshot,
+  query,
+  where,
   serverTimestamp,
   setDoc,
   updateDoc,
@@ -36,17 +38,15 @@ export default function UserManagement() {
   const [directUid, setDirectUid] = useState('');
   const [directRole, setDirectRole] = useState('manager');
 
-  const isOwner =
-    access?.role === 'owner' ||
-    Boolean(user?.email && user.email.toLowerCase().includes('developerhar'));
-  const canManage = isOwner || access?.role === 'manager';
+  const isOwner = access?.status === 'active' && access?.role === 'owner';
+  const canManage = access?.status === 'active' && (isOwner || access?.role === 'manager');
 
   // Load All Invitations & User Access Records
   useEffect(() => {
     if (!canManage) return undefined;
 
     const unsubInvites = onSnapshot(
-      collection(db, 'invitations'),
+      query(collection(db, 'invitations'), where('businessId', '==', access.businessId)),
       (snapshot) => {
         setInvitations(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })));
       },
@@ -57,7 +57,7 @@ export default function UserManagement() {
     );
 
     const unsubUsers = onSnapshot(
-      collection(db, 'userAccess'),
+      query(collection(db, 'userAccess'), where('businessId', '==', access.businessId)),
       (snapshot) => {
         setActiveUsers(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })));
       },
@@ -70,7 +70,7 @@ export default function UserManagement() {
       unsubInvites();
       unsubUsers();
     };
-  }, [canManage]);
+  }, [canManage, access?.businessId]);
 
   const inviteUser = async (event) => {
     if (event) event.preventDefault();

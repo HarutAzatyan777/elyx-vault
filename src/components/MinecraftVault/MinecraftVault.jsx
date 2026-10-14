@@ -30,8 +30,8 @@ export const MinecraftVault = ({ masterPassword }) => {
       vaultQuery,
       (querySnapshot) => {
         const items = querySnapshot.docs.map((doc) => ({
-          id: doc.id,
           ...doc.data(),
+            id: doc.id,
         }));
         setVaultItems(items);
         setIsLoading(false);
@@ -62,7 +62,7 @@ export const MinecraftVault = ({ masterPassword }) => {
           <div>
             <h2 className={styles.mcTitle}>Minecraft Server Vault</h2>
             <p className={styles.mcSubtitle}>
-              Manage RCON commands, encrypted <code>.env</code> files, and server credentials safely with zero-knowledge AES encryption.
+              Manage RCON commands, encrypted <code>.env</code> files, and server credentials safely with client-side credential encryption.
             </p>
           </div>
         </div>

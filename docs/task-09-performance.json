@@ -1,0 +1,54 @@
+{
+  "method": "Static import graph from production HTML entry; dynamic app chunks excluded",
+  "baselineTask08": {
+    "approxBytes": 1852940,
+    "approxGzipBytes": 518990
+  },
+  "current": {
+    "bytes": 1105382,
+    "gzipBytes": 333213,
+    "chunks": [
+      {
+        "file": "assets/index-CRkzTat-.js",
+        "bytes": 293656,
+        "gzipBytes": 90708
+      },
+      {
+        "file": "assets/jsx-runtime-BjemdXaz.js",
+        "bytes": 8925,
+        "gzipBytes": 3440
+      },
+      {
+        "file": "assets/access-ChbjcxAZ.js",
+        "bytes": 595,
+        "gzipBytes": 329
+      },
+      {
+        "file": "assets/preload-helper-Czpn1I53.js",
+        "bytes": 1196,
+        "gzipBytes": 675
+      },
+      {
+        "file": "assets/useAuth-DK1pa5fU.js",
+        "bytes": 729429,
+        "gzipBytes": 213068
+      },
+      {
+        "file": "assets/persistence-BXBS-rnO.js",
+        "bytes": 731,
+        "gzipBytes": 339
+      },
+      {
+        "file": "assets/securePayload-B5C9ckHO.js",
+        "bytes": 571,
+        "gzipBytes": 344
+      },
+      {
+        "file": "assets/crypto-BgqFsype.js",
+        "bytes": 70279,
+        "gzipBytes": 24310
+      }
+    ]
+  },
+  "reductionPercent": 35.8
+}

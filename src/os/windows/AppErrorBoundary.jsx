@@ -7,19 +7,21 @@ import React, { Component } from 'react';
 export class AppErrorBoundary extends Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false };
   }
 
-  static getDerivedStateFromError(error) {
-    return { hasError: true, error };
+  static getDerivedStateFromError() {
+    return { hasError: true };
   }
 
-  componentDidCatch(error, errorInfo) {
-    console.error(`[AppErrorBoundary] Error in app "${this.props.appTitle || 'App'}":`, error, errorInfo);
+  componentDidCatch() {
+    console.error(
+      '[AppErrorBoundary] Application failed. Close and reopen it to recover.',
+    );
   }
 
   handleReset = () => {
-    this.setState({ hasError: false, error: null });
+    this.setState({ hasError: false });
   };
 
   render() {
@@ -40,7 +42,13 @@ export class AppErrorBoundary extends Component {
           role="alert"
         >
           <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>⚠️</div>
-          <h3 style={{ margin: '0 0 8px 0', fontSize: '1.125rem', fontWeight: 700 }}>
+          <h3
+            style={{
+              margin: '0 0 8px 0',
+              fontSize: '1.125rem',
+              fontWeight: 700,
+            }}
+          >
             {this.props.appTitle || 'Application'} Encountered an Error
           </h3>
           <p
@@ -52,7 +60,8 @@ export class AppErrorBoundary extends Component {
               lineHeight: 1.4,
             }}
           >
-            {this.state.error?.message || 'An unexpected error occurred while executing this module.'}
+            This application could not load. Retry, reload Elyx, or return home.
+            Reloading locks the vault.
           </p>
           <button
             type="button"
@@ -69,6 +78,12 @@ export class AppErrorBoundary extends Component {
             }}
           >
             Reload Component
+          </button>
+          <button type="button" onClick={() => window.location.reload()}>
+            Reload Elyx
+          </button>
+          <button type="button" onClick={() => window.location.assign('/')}>
+            Return home
           </button>
         </div>
       );

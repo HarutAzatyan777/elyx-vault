@@ -1,30 +1,15 @@
-import React, { useEffect, useRef } from 'react';
+import { useOS } from '../hooks/useOS.js';
+import { useFlyoutFocus } from '../hooks/useFlyoutFocus.js';
+import React, { useRef } from 'react';
 import { useNotifications } from '../hooks/useNotifications.js';
 import styles from './TopBar.module.css';
 
 export function NotificationsFlyout({ isOpen, onClose }) {
-  const { notifications, dismiss, clearAll } = useNotifications();
+  const { notifications, dismiss, clearAll, markRead, unreadCount } = useNotifications();
+  const { settings } = useOS();
   const flyoutRef = useRef(null);
 
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handleDown = (e) => {
-      if (flyoutRef.current && !flyoutRef.current.contains(e.target)) {
-        onClose();
-      }
-    };
-    const handleKey = (e) => {
-      if (e.key === 'Escape') onClose();
-    };
-
-    window.addEventListener('mousedown', handleDown);
-    window.addEventListener('keydown', handleKey);
-    return () => {
-      window.removeEventListener('mousedown', handleDown);
-      window.removeEventListener('keydown', handleKey);
-    };
-  }, [isOpen, onClose]);
+  useFlyoutFocus(isOpen, flyoutRef, onClose);
 
   if (!isOpen) return null;
 
@@ -37,7 +22,7 @@ export function NotificationsFlyout({ isOpen, onClose }) {
       aria-label="Notification Center"
     >
       <div className={styles.notifHeader}>
-        <span className={styles.notifTitle}>Notifications</span>
+        <span className={styles.notifTitle}>Notifications · {unreadCount} unread</span><button type="button" onClick={() => markRead()}>Mark all read</button><button type="button" onClick={onClose} aria-label="Close notification center">×</button>
         {notifications.length > 0 && (
           <button
             type="button"
@@ -58,17 +43,19 @@ export function NotificationsFlyout({ isOpen, onClose }) {
           notifications.map((n) => (
             <div key={n.id} className={styles.notifItem}>
               <div className={styles.notifItemHeader}>
-                <span className={styles.notifItemTitle}>{n.title}</span>
+                <span className={styles.notifItemTitle}>{!n.read && <span aria-label="Unread">● </span>}{settings.notificationPrivacy ? "New notification" : n.title}</span>
                 <button
                   type="button"
                   className={styles.notifDismissBtn}
                   onClick={() => dismiss(n.id)}
-                  title="Dismiss notification"
+                  aria-label="Clear notification"
                 >
                   ×
                 </button>
               </div>
-              {n.message && <p className={styles.notifItemMessage}>{n.message}</p>}
+              {!settings.notificationPrivacy && n.message && <p className={styles.notifItemMessage}>{n.message}</p>}
+              <small>{n.category} · {new Date(n.timestamp).toLocaleString()}</small>
+              {!n.read && <button type="button" onClick={() => markRead(n.id)}>Mark as read</button>}
             </div>
           ))
         )}

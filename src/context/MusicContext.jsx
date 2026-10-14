@@ -1,3 +1,5 @@
+import { resolveAudioSource } from '../utils/securePayload.js';
+import { useAuth } from '../hooks/useAuth.jsx';
 import React, {
   createContext,
   useContext,
@@ -5,22 +7,29 @@ import React, {
   useEffect,
   useRef,
   useCallback,
+  useMemo,
 } from 'react';
 import { getAudioBlob } from '../services/musicService';
-import { decryptData } from '../utils/crypto';
 import { auth } from '../config/firebase';
 import { broadcastLiveMusicSync } from '../services/rtdbService';
 
 const MusicContext = createContext(null);
+const MusicProgressContext = createContext({ currentTime: 0, duration: 0 });
 
 export const MusicProvider = ({ children }) => {
+  const { user } = useAuth();
   const [currentTrack, setCurrentTrack] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [playbackError, setPlaybackError] = useState('');
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolumeState] = useState(() => {
-    const saved = localStorage.getItem('elyx_music_volume');
-    return saved !== null ? parseFloat(saved) : 0.85;
+    try {
+      const saved = Number(localStorage.getItem('elyx_music_volume') ?? 0.85);
+      return Number.isFinite(saved) ? Math.max(0, Math.min(1, saved)) : 0.85;
+    } catch {
+      return 0.85;
+    }
   });
   const [isMuted, setIsMuted] = useState(false);
   const [queue, setQueue] = useState([]);
@@ -28,6 +37,9 @@ export const MusicProvider = ({ children }) => {
   const [isShuffle, setIsShuffle] = useState(false);
 
   const audioRef = useRef(null);
+  const objectUrlRef = useRef(null);
+  const playbackKey = useRef(null);
+  const playbackGeneration = useRef(0);
 
   // Initialize Audio element once
   useEffect(() => {
@@ -62,6 +74,26 @@ export const MusicProvider = ({ children }) => {
       audio.removeEventListener('play', handlePlay);
       audio.removeEventListener('pause', handlePause);
       audio.pause();
+      audio.removeAttribute('src');
+      audio.load();
+      playbackGeneration.current += 1;
+      playbackKey.current = null;
+      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+      if ('mediaSession' in navigator) {
+        try {
+          navigator.mediaSession.metadata = null;
+          navigator.mediaSession.playbackState = 'none';
+          for (const action of [
+            'play',
+            'pause',
+            'previoustrack',
+            'nexttrack',
+            'stop',
+            'seekto',
+          ])
+            navigator.mediaSession.setActionHandler(action, null);
+        } catch {}
+      }
     };
   }, []);
 
@@ -70,7 +102,9 @@ export const MusicProvider = ({ children }) => {
     if (audioRef.current) {
       audioRef.current.volume = isMuted ? 0 : volume;
     }
-    localStorage.setItem('elyx_music_volume', volume.toString());
+    try {
+      localStorage.setItem('elyx_music_volume', volume.toString());
+    } catch {}
   }, [volume, isMuted]);
 
   // Live broadcast playback status to Firebase Realtime Database
@@ -82,23 +116,8 @@ export const MusicProvider = ({ children }) => {
   }, [currentTrack, isPlaying]);
 
   // Resolve audio source (URL or IndexedDB binary blob)
-  const resolveAudioUrl = async (track, masterPassword) => {
-    if (!track) return null;
-
-    // Check if stored in IndexedDB
-    const blobData = await getAudioBlob(track.id);
-    if (blobData) {
-      return blobData;
-    }
-
-    // Check if encrypted
-    if (track.isEncrypted && masterPassword) {
-      const decrypted = decryptData(track.url, masterPassword);
-      if (decrypted) return decrypted;
-    }
-
-    return track.url;
-  };
+  const resolveAudioUrl = (track, password) =>
+    resolveAudioSource(track, password, getAudioBlob);
 
   // Play a specific track
   const playTrack = useCallback(
@@ -109,24 +128,51 @@ export const MusicProvider = ({ children }) => {
         setQueue(newQueue);
       }
 
+      audioRef.current.pause();
+      audioRef.current.removeAttribute('src');
+      audioRef.current.load();
+      setCurrentTime(0);
+      setDuration(0);
+      setPlaybackError('');
+      const generation = ++playbackGeneration.current;
+      playbackKey.current = masterPassword;
       setCurrentTrack(track);
 
       try {
         const audioSrc = await resolveAudioUrl(track, masterPassword);
+        if (generation !== playbackGeneration.current) return;
         if (!audioSrc) {
-          console.warn('Could not resolve audio source for track:', track.title);
+          console.warn(
+            'Could not resolve audio source for track:',
+            track.title,
+          );
           return;
         }
 
-        audioRef.current.src = audioSrc;
+        if (objectUrlRef.current) {
+          URL.revokeObjectURL(objectUrlRef.current);
+          objectUrlRef.current = null;
+        }
+        const source =
+          audioSrc instanceof Blob ? URL.createObjectURL(audioSrc) : audioSrc;
+        if (audioSrc instanceof Blob) objectUrlRef.current = source;
+        audioRef.current.src = source;
         audioRef.current.currentTime = 0;
         await audioRef.current.play();
-        setIsPlaying(true);
+        if (generation === playbackGeneration.current) setIsPlaying(true);
       } catch (err) {
-        console.warn('Playback initiation error:', err);
+        if (generation === playbackGeneration.current) {
+          setCurrentTrack(null);
+          setIsPlaying(false);
+          playbackKey.current = null;
+          setPlaybackError(
+            'Unable to play this track. Check your vault key or audio source and try again.',
+          );
+        }
+        console.warn('[Audio] Playback could not start.');
       }
     },
-    []
+    [],
   );
 
   // Toggle play / pause
@@ -141,6 +187,14 @@ export const MusicProvider = ({ children }) => {
 
   // Stop playback completely & unload track
   const stopPlayback = useCallback(() => {
+    playbackGeneration.current += 1;
+    playbackKey.current = null;
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current);
+      objectUrlRef.current = null;
+    }
+    setQueue([]);
+    setPlaybackError('');
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
@@ -155,9 +209,29 @@ export const MusicProvider = ({ children }) => {
     if ('mediaSession' in navigator) {
       try {
         navigator.mediaSession.playbackState = 'none';
+        navigator.mediaSession.metadata = null;
+        for (const action of [
+          'play',
+          'pause',
+          'previoustrack',
+          'nexttrack',
+          'stop',
+          'seekto',
+        ])
+          navigator.mediaSession.setActionHandler(action, null);
       } catch {}
     }
   }, []);
+
+  useEffect(() => {
+    stopPlayback();
+  }, [user?.uid, stopPlayback]);
+
+  useEffect(() => {
+    const lock = () => stopPlayback();
+    window.addEventListener('elyx:vault-locked', lock);
+    return () => window.removeEventListener('elyx:vault-locked', lock);
+  }, [stopPlayback]);
 
   // Next Track
   const playNext = useCallback(() => {
@@ -180,6 +254,7 @@ export const MusicProvider = ({ children }) => {
         if (repeatMode === 'all') {
           nextIndex = 0;
         } else {
+          audioRef.current?.pause();
           setIsPlaying(false);
           return;
         }
@@ -188,7 +263,7 @@ export const MusicProvider = ({ children }) => {
       }
     }
 
-    playTrack(queue[nextIndex]);
+    playTrack(queue[nextIndex], null, playbackKey.current);
   }, [queue, currentTrack, repeatMode, isShuffle, playTrack]);
 
   // Prev Track
@@ -207,7 +282,7 @@ export const MusicProvider = ({ children }) => {
       prevIndex = queue.length - 1;
     }
 
-    playTrack(queue[prevIndex]);
+    playTrack(queue[prevIndex], null, playbackKey.current);
   }, [queue, currentTrack, playTrack]);
 
   // Handle track ended
@@ -274,67 +349,97 @@ export const MusicProvider = ({ children }) => {
   }, [currentTrack, stopPlayback, playNext, playPrev]);
 
   // Seek
-  const seekTo = (seconds) => {
+  const seekTo = useCallback((seconds) => {
     if (audioRef.current) {
       audioRef.current.currentTime = seconds;
       setCurrentTime(seconds);
     }
-  };
+  }, []);
 
   // Set Volume
-  const setVolume = (val) => {
-    const clamped = Math.max(0, Math.min(1, val));
-    setVolumeState(clamped);
-    if (isMuted && clamped > 0) {
-      setIsMuted(false);
-    }
-  };
+  const setVolume = useCallback(
+    (val) => {
+      const clamped = Math.max(0, Math.min(1, val));
+      setVolumeState(clamped);
+      if (isMuted && clamped > 0) {
+        setIsMuted(false);
+      }
+    },
+    [isMuted],
+  );
 
-  const toggleMute = () => {
+  const toggleMute = useCallback(() => {
     setIsMuted((prev) => !prev);
-  };
+  }, []);
 
-  const toggleShuffle = () => {
+  const toggleShuffle = useCallback(() => {
     setIsShuffle((prev) => !prev);
-  };
+  }, []);
 
-  const toggleRepeat = () => {
+  const toggleRepeat = useCallback(() => {
     setRepeatMode((prev) => {
       if (prev === 'off') return 'all';
       if (prev === 'all') return 'one';
       return 'off';
     });
-  };
+  }, []);
 
+  const value = useMemo(
+    () => ({
+      currentTrack,
+      isPlaying,
+      playbackError,
+      volume,
+      isMuted,
+      queue,
+      repeatMode,
+      isShuffle,
+      playTrack,
+      togglePlayPause,
+      stopPlayback,
+      playNext,
+      playPrev,
+      seekTo,
+      setVolume,
+      toggleMute,
+      toggleShuffle,
+      toggleRepeat,
+      setQueue,
+    }),
+    [
+      currentTrack,
+      isPlaying,
+      playbackError,
+      volume,
+      isMuted,
+      queue,
+      repeatMode,
+      isShuffle,
+      playTrack,
+      togglePlayPause,
+      stopPlayback,
+      playNext,
+      playPrev,
+      seekTo,
+      setVolume,
+      toggleMute,
+      toggleShuffle,
+      toggleRepeat,
+    ],
+  );
+  const progress = useMemo(
+    () => ({ currentTime, duration }),
+    [currentTime, duration],
+  );
   return (
-    <MusicContext.Provider
-      value={{
-        currentTrack,
-        isPlaying,
-        currentTime,
-        duration,
-        volume,
-        isMuted,
-        queue,
-        repeatMode,
-        isShuffle,
-        playTrack,
-        togglePlayPause,
-        stopPlayback,
-        playNext,
-        playPrev,
-        seekTo,
-        setVolume,
-        toggleMute,
-        toggleShuffle,
-        toggleRepeat,
-        setQueue,
-      }}
-    >
-      {children}
+    <MusicContext.Provider value={value}>
+      <MusicProgressContext.Provider value={progress}>
+        {children}
+      </MusicProgressContext.Provider>
     </MusicContext.Provider>
   );
 };
+export const useMusicProgress = () => useContext(MusicProgressContext);
 
 export const useMusic = () => {
   const context = useContext(MusicContext);

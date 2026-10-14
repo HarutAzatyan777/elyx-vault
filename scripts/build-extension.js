@@ -30,6 +30,8 @@ if (fs.existsSync(OUTPUT_ZIP)) {
 }
 
 try {
+  // Keep the served unpacked mirror consistent with the downloadable archive.
+  fs.cpSync(SOURCE_DIR, path.join(PUBLIC_DIR, 'extension'), { recursive: true });
   console.log(`[Packaging] Zipping extension folder into public/extension.zip (nested inside extension/)...`);
 
   if (process.platform === 'win32') {

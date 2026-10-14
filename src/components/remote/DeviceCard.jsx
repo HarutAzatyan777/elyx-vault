@@ -68,7 +68,7 @@ export function DeviceCard({
 
         <span className={`${styles.statusBadge} ${isOnline ? styles.statusOnline : styles.statusOffline}`}>
           <span className={styles.statusDot} />
-          {isOnline ? 'ONLINE' : 'OFFLINE'}
+          {isOnline ? 'REPORTED ONLINE' : device.status === 'offline' ? 'REPORTED OFFLINE' : 'UNVERIFIED'}
         </span>
       </div>
 

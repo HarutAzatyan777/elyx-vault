@@ -105,8 +105,9 @@ export const Notepad = ({ masterPassword, onUnlockVault }) => {
 
   // Update note
   const handleUpdateNote = async (updatedFields) => {
-    if (!activeNote) return;
-    const merged = { ...activeNote, ...updatedFields };
+    const target = notes.find(n => n.id === updatedFields.id);
+    if (!target || !masterPassword) return;
+    const merged = { ...target, ...updatedFields };
 
     setNotes((prev) =>
       prev.map((n) => (n.id === merged.id ? merged : n))
@@ -230,6 +231,7 @@ export const Notepad = ({ masterPassword, onUnlockVault }) => {
         {/* Right Editor Area */}
         <div className={styles.editorPane}>
           <NoteEditor
+        key={activeNote?.id}
             note={activeNote}
             masterPassword={masterPassword}
             onUpdateNote={handleUpdateNote}

@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import { canUserLaunchApp, getAppById } from '../os/registry/appRegistry.js';
+import React, { lazy, useCallback, useEffect, useState } from 'react';
 import {
   collection,
   deleteDoc,
@@ -13,26 +14,32 @@ import { useAuth } from '../hooks/useAuth.jsx';
 
 import { MasterPassModal } from '../components/MasterPassModal';
 import { ProjectCard } from '../components/ProjectCard';
-import AddProject from '../components/AddProject';
+const AddProject = lazy(() => import('../components/AddProject'));
 import InstallGuideModal from '../components/InstallGuideModal';
 
-import UserManagement from '../components/UserManagement';
-import MinecraftVault from '../components/MinecraftVault/MinecraftVault';
-import DailyWorkspace from '../components/daily-workspace/DailyWorkspace';
-import Notepad from '../components/notepad/Notepad';
-import MediaVault from '../components/media/MediaVault';
-import MusicVault from '../components/music/MusicVault';
+const UserManagement = lazy(() => import('../components/UserManagement'));
+const MinecraftVault = lazy(
+  () => import('../components/MinecraftVault/MinecraftVault'),
+);
+const DailyWorkspace = lazy(
+  () => import('../components/daily-workspace/DailyWorkspace'),
+);
+const Notepad = lazy(() => import('../components/notepad/Notepad'));
+const MediaVault = lazy(() => import('../components/media/MediaVault'));
+const MusicVault = lazy(() => import('../components/music/MusicVault'));
 import { GlobalAudioPlayer } from '../components/music/GlobalAudioPlayer';
 import { useMusic } from '../context/MusicContext';
-import DeviceList from '../components/remote/DeviceList';
+const DeviceList = lazy(() => import('../components/remote/DeviceList'));
 import DeviceEnrollmentModal from '../components/remote/DeviceEnrollmentModal';
-import RemoteTerminal from '../components/remote/RemoteTerminal';
+const RemoteTerminal = lazy(
+  () => import('../components/remote/RemoteTerminal'),
+);
 import { useRemoteDevices } from '../hooks/useRemoteDevices';
 import { subscribeRTDBConnection } from '../services/rtdbService';
 import Sidebar from '../components/Sidebar';
 import { useOS } from '../os/index.js';
-import DesktopShell from '../os/shell/DesktopShell.jsx';
-import MobileShell from '../os/mobile/MobileShell.jsx';
+const DesktopShell = lazy(() => import('../os/shell/DesktopShell.jsx'));
+const MobileShell = lazy(() => import('../os/mobile/MobileShell.jsx'));
 import { loadDeviceMode, saveDeviceMode } from '../os/mobile/types.js';
 
 import styles from './Dashboard.module.css';
@@ -75,10 +82,11 @@ const getInitialTab = () => {
 
 export const Dashboard = () => {
   const { user, access, logout } = useAuth();
-  const { isOSMode, toggleOSMode } = useOS();
+  const { settings, isOSMode, toggleOSMode, addNotification } = useOS();
   const {
     devices,
     securityEvents,
+    notification: deviceNotification,
     selectedDevice,
     selectedDeviceId,
     setSelectedDeviceId,
@@ -94,15 +102,44 @@ export const Dashboard = () => {
     stopPlayback: stopMusicPlayback,
   } = useMusic();
 
+  const [isRTDBConnected, setIsRTDBConnected] = useState(false);
+  useEffect(() => {
+    if (deviceNotification)
+      addNotification({
+        id: `device_${deviceNotification.id}`,
+        category: 'devices',
+        title: 'Device update',
+        message: deviceNotification.message,
+        type: deviceNotification.type,
+      });
+  }, [deviceNotification, addNotification]);
+  const previousConnection = React.useRef(null);
+  useEffect(() => {
+    if (
+      previousConnection.current !== null &&
+      previousConnection.current !== isRTDBConnected
+    )
+      addNotification({
+        category: 'system',
+        title: isRTDBConnected
+          ? 'Firebase connection restored'
+          : 'Firebase disconnected',
+        message: 'Realtime Database connection changed.',
+      });
+    previousConnection.current = isRTDBConnected;
+  }, [isRTDBConnected, addNotification]);
+
+  const [isOffline, setIsOffline] = useState(() => !navigator.onLine);
+  const [projectsError, setProjectsError] = useState('');
   const [projects, setProjects] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [masterPassword, setMasterPassword] = useState(() => {
+  const [masterPassword, setMasterPassword] = useState(null);
+  useEffect(() => {
     try {
-      return sessionStorage.getItem('elyx_master_pass') || localStorage.getItem('elyx_master_pass') || null;
-    } catch {
-      return null;
-    }
-  });
+      sessionStorage.removeItem('elyx_master_pass');
+      localStorage.removeItem('elyx_master_pass');
+    } catch {}
+  }, []);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
   const [isEnrollModalOpen, setIsEnrollModalOpen] = useState(false);
   const [mainTab, setMainTab] = useState(getInitialTab);
@@ -115,10 +152,9 @@ export const Dashboard = () => {
     }
   });
 
-  const [isRTDBConnected, setIsRTDBConnected] = useState(false);
   const [deviceMode, setDeviceModeState] = useState(loadDeviceMode);
   const [viewportWidth, setViewportWidth] = useState(() =>
-    typeof window !== 'undefined' ? window.innerWidth : 1200
+    typeof window !== 'undefined' ? window.innerWidth : 1200,
   );
 
   // Subscribe to Realtime Database live connection status
@@ -178,13 +214,14 @@ export const Dashboard = () => {
   };
 
   useEffect(() => {
-    if (!user) {
+    if (!user || !access?.businessId || access.status !== 'active') {
       setProjects([]);
       setIsLoading(false);
       return;
     }
 
     setIsLoading(true);
+    setProjectsError('');
 
     const projectsCollection = collection(db, 'projects');
     const projectsQuery = access?.businessId
@@ -195,52 +232,89 @@ export const Dashboard = () => {
       projectsQuery,
       (querySnapshot) => {
         const fetchedProjects = querySnapshot.docs.map((projectDoc) => ({
-          id: projectDoc.id,
           ...projectDoc.data(),
+            id: projectDoc.id,
         }));
 
         setProjects(fetchedProjects);
         setIsLoading(false);
       },
       (error) => {
-        console.error('Error fetching projects in real-time:', error);
+        setProjects([]);
+        setProjectsError(
+          'Projects could not be loaded. Check your connection or access, then reload.',
+        );
         setIsLoading(false);
-      }
+      },
     );
 
     return () => unsubscribe();
   }, [user, access?.businessId]);
 
-  const handleUnlockVault = (password, remember = true) => {
-    setMasterPassword(password);
-    try {
-      sessionStorage.setItem('elyx_master_pass', password);
-      if (remember) {
-        localStorage.setItem('elyx_master_pass', password);
-      }
-    } catch (err) {
-      console.error('Failed to store master pass:', err);
-    }
+  const handleUnlockVault = (password) => {
+    if (
+      !isOffline &&
+      user &&
+      access?.status === 'active' &&
+      typeof password === 'string' &&
+      password.trim()
+    )
+      setMasterPassword(password);
   };
-
-  const handleLockVault = () => {
+  const handleLockVault = useCallback(() => {
     setMasterPassword(null);
-    try {
-      sessionStorage.removeItem('elyx_master_pass');
-      localStorage.removeItem('elyx_master_pass');
-    } catch (err) {
-      console.error('Failed to clear master pass:', err);
-    }
-  };
+    stopMusicPlayback();
+    window.dispatchEvent(new Event('elyx:vault-locked'));
+    window.dispatchEvent(new Event('ELYX_VAULT_LOCKED'));
+  }, [stopMusicPlayback]);
+  useEffect(() => {
+    if (!masterPassword) return;
+    let timer;
+    let lastActivity = Date.now();
+    const foreground = () => {
+      if (Date.now() - lastActivity >= settings.autoLockMinutes * 60000)
+        handleLockVault();
+    };
+    const reset = () => {
+      clearTimeout(timer);
+      lastActivity = Date.now();
+      timer = setTimeout(handleLockVault, settings.autoLockMinutes * 60000);
+    };
+    reset();
+    document.addEventListener('visibilitychange', foreground);
+    window.addEventListener('pointerdown', reset);
+    window.addEventListener('keydown', reset);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('visibilitychange', foreground);
+      window.removeEventListener('pointerdown', reset);
+      window.removeEventListener('keydown', reset);
+    };
+  }, [masterPassword, settings.autoLockMinutes, handleLockVault]);
+
+  useEffect(() => {
+    const offline = () => {
+      setIsOffline(true);
+      handleLockVault();
+    };
+    const online = () => setIsOffline(false);
+    window.addEventListener('offline', offline);
+    window.addEventListener('online', online);
+    return () => {
+      window.removeEventListener('offline', offline);
+      window.removeEventListener('online', online);
+    };
+  }, [handleLockVault]);
 
   const handleDelete = async (projectId) => {
-    if (!projectId) return;
+    if (!projectId || access?.status !== 'active' || access.role === 'viewer')
+      return;
 
     try {
       await deleteDoc(doc(db, 'projects', projectId));
 
       setProjects((currentProjects) =>
-        currentProjects.filter((project) => project.id !== projectId)
+        currentProjects.filter((project) => project.id !== projectId),
       );
     } catch (error) {
       console.error('Error deleting project:', error);
@@ -252,7 +326,11 @@ export const Dashboard = () => {
   };
 
   const handleTestGoogleClick = () => {
-    window.open('https://accounts.google.com/', '_blank', 'noopener,noreferrer');
+    window.open(
+      'https://accounts.google.com/',
+      '_blank',
+      'noopener,noreferrer',
+    );
   };
 
   const handleTabChange = (tab) => {
@@ -271,6 +349,9 @@ export const Dashboard = () => {
     if (isMobile) {
       return (
         <MobileShell
+          systemNotice={
+            isOffline ? 'Offline — the vault is locked.' : projectsError
+          }
           user={user}
           access={access}
           projects={projects}
@@ -298,6 +379,9 @@ export const Dashboard = () => {
 
     return (
       <DesktopShell
+        systemNotice={
+          isOffline ? 'Offline — the vault is locked.' : projectsError
+        }
         user={user}
         access={access}
         projects={projects}
@@ -341,7 +425,9 @@ export const Dashboard = () => {
         onToggleCollapse={toggleSidebarCollapse}
       />
 
-      <div className={`${styles.mainWrapper} ${isSidebarCollapsed ? styles.mainWrapperCollapsed : ''}`}>
+      <div
+        className={`${styles.mainWrapper} ${isSidebarCollapsed ? styles.mainWrapperCollapsed : ''}`}
+      >
         <header className={styles.topBar}>
           <div className={styles.topBarLeft}>
             {/* Mobile menu trigger */}
@@ -372,8 +458,14 @@ export const Dashboard = () => {
               type="button"
               className={styles.desktopCollapseBtn}
               onClick={toggleSidebarCollapse}
-              title={isSidebarCollapsed ? 'Ընդարձակել sidebar-ը' : 'Փոքրացնել sidebar-ը'}
-              aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              title={
+                isSidebarCollapsed
+                  ? 'Ընդարձակել sidebar-ը'
+                  : 'Փոքրացնել sidebar-ը'
+              }
+              aria-label={
+                isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'
+              }
             >
               <svg
                 fill="none"
@@ -383,9 +475,19 @@ export const Dashboard = () => {
                 height="18"
               >
                 {isSidebarCollapsed ? (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M13 5l7 7-7 7M5 5l7 7-7 7"
+                  />
                 ) : (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M11 19l-7-7 7-7m8 14l-7-7 7-7"
+                  />
                 )}
               </svg>
             </button>
@@ -395,38 +497,38 @@ export const Dashboard = () => {
                 {mainTab === 'daily_workspace'
                   ? '⚡ Daily Workspace'
                   : mainTab === 'notepad'
-                  ? '📝 Smart Notepad & Secure Vault'
-                  : mainTab === 'media'
-                  ? '🎬 Media Vault & Video Studio'
-                  : mainTab === 'music'
-                  ? '🎵 Music Vault & Background Studio'
-                  : mainTab === 'devices'
-                  ? '🖥️ My Devices & Tailscale Nodes'
-                  : mainTab === 'terminal'
-                  ? '⚡ Remote PowerShell Terminal'
-                  : mainTab === 'users'
-                  ? '👥 Users & Access Management'
-                  : mainTab === 'general'
-                  ? '🔐 Web Projects Vault'
-                  : '⛏️ Minecraft Server Vault'}
+                    ? '📝 Smart Notepad & Secure Vault'
+                    : mainTab === 'media'
+                      ? '🎬 Media Vault & Video Studio'
+                      : mainTab === 'music'
+                        ? '🎵 Music Vault & Background Studio'
+                        : mainTab === 'devices'
+                          ? '🖥️ My Devices & Tailscale Nodes'
+                          : mainTab === 'terminal'
+                            ? '⚡ Remote PowerShell Terminal'
+                            : mainTab === 'users'
+                              ? '👥 Users & Access Management'
+                              : mainTab === 'general'
+                                ? '🔐 Web Projects Vault'
+                                : '⛏️ Minecraft Server Vault'}
               </h1>
 
               <p className={styles.pageSubtitle}>
                 {mainTab === 'daily_workspace'
                   ? 'Productivity & Morning Routine Dashboard'
                   : mainTab === 'notepad'
-                  ? 'Markdown editor, interactive checklists, code snippets & AES zero-knowledge encryption'
-                  : mainTab === 'media'
-                  ? 'High-res photos, 4K video player, YouTube streams & zero-knowledge encryption'
-                  : mainTab === 'music'
-                  ? 'Background playback, drag & drop songs, playlists & MediaSession OS integration'
-                  : mainTab === 'devices'
-                  ? 'Manage enrolled Windows PCs running Elyx Agent'
-                  : mainTab === 'terminal'
-                  ? 'Interactive PowerShell PTY session over Tailscale'
-                  : mainTab === 'users'
-                  ? 'Role Level Control & User Authorization'
-                  : 'Zero-Knowledge Encrypted Storage'}
+                    ? 'Markdown editor, interactive checklists, code snippets & AES optional client-side encryption'
+                    : mainTab === 'media'
+                      ? 'High-res photos, 4K video player, YouTube streams & optional client-side encryption'
+                      : mainTab === 'music'
+                        ? 'Background playback, drag & drop songs, playlists & MediaSession OS integration'
+                        : mainTab === 'devices'
+                          ? 'Manage enrolled Windows PCs running Elyx Agent'
+                          : mainTab === 'terminal'
+                            ? 'Interactive PowerShell PTY session over Tailscale'
+                            : mainTab === 'users'
+                              ? 'Role Level Control & User Authorization'
+                              : 'Credential Encryption'}
               </p>
             </div>
           </div>
@@ -457,8 +559,12 @@ export const Dashboard = () => {
                   onClick={() => handleTabChange('music')}
                   title="Բացել Music Vault-ը"
                 >
-                  <span className={styles.audioPillTitle}>{currentTrack.title}</span>
-                  <span className={styles.audioPillArtist}>{currentTrack.artist || 'Audio'}</span>
+                  <span className={styles.audioPillTitle}>
+                    {currentTrack.title}
+                  </span>
+                  <span className={styles.audioPillArtist}>
+                    {currentTrack.artist || 'Audio'}
+                  </span>
                 </div>
 
                 {/* Quick Play/Pause button */}
@@ -466,15 +572,27 @@ export const Dashboard = () => {
                   type="button"
                   className={styles.audioPillBtn}
                   onClick={toggleMusicPlayPause}
-                  title={isMusicPlaying ? 'Դադարեցնել (Pause)' : 'Շարունակել (Play)'}
+                  title={
+                    isMusicPlaying ? 'Դադարեցնել (Pause)' : 'Շարունակել (Play)'
+                  }
                   aria-label={isMusicPlaying ? 'Pause' : 'Play'}
                 >
                   {isMusicPlaying ? (
-                    <svg fill="currentColor" viewBox="0 0 24 24" width="12" height="12">
+                    <svg
+                      fill="currentColor"
+                      viewBox="0 0 24 24"
+                      width="12"
+                      height="12"
+                    >
                       <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
                     </svg>
                   ) : (
-                    <svg fill="currentColor" viewBox="0 0 24 24" width="12" height="12">
+                    <svg
+                      fill="currentColor"
+                      viewBox="0 0 24 24"
+                      width="12"
+                      height="12"
+                    >
                       <path d="M8 5v14l11-7z" />
                     </svg>
                   )}
@@ -488,8 +606,19 @@ export const Dashboard = () => {
                   title="Անջատել երգը (Turn Off / Stop)"
                   aria-label="Turn off music"
                 >
-                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="12" height="12">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+                  <svg
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    width="12"
+                    height="12"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2.5"
+                      d="M6 18L18 6M6 6l12 12"
+                    />
                   </svg>
                 </button>
               </div>
@@ -504,7 +633,9 @@ export const Dashboard = () => {
                   : 'Firebase Realtime Database: Միանում է...'
               }
             >
-              <span className={`${styles.rtdbDot} ${isRTDBConnected ? styles.rtdbOnline : ''}`} />
+              <span
+                className={`${styles.rtdbDot} ${isRTDBConnected ? styles.rtdbOnline : ''}`}
+              />
               <span>{isRTDBConnected ? 'RTDB Live' : 'RTDB Connecting'}</span>
             </div>
 
@@ -525,9 +656,7 @@ export const Dashboard = () => {
             </button>
 
             {access?.role && (
-              <span className={styles.roleBadge}>
-                {access.role}
-              </span>
+              <span className={styles.roleBadge}>{access.role}</span>
             )}
 
             {masterPassword && (
@@ -559,7 +688,18 @@ export const Dashboard = () => {
         </header>
 
         <main className={styles.main}>
-          {mainTab === 'daily_workspace' ? (
+          {(isOffline || projectsError) && (
+            <p role="status">
+              {isOffline ? 'Offline — the vault is locked.' : projectsError}
+            </p>
+          )}
+          {!canUserLaunchApp(mainTab, access?.role) ? (
+            <p role="alert">
+              You do not have permission to open this application.
+            </p>
+          ) : getAppById(mainTab)?.requiresMasterPassword && !masterPassword ? (
+            <MasterPassModal onSubmit={handleUnlockVault} />
+          ) : mainTab === 'daily_workspace' ? (
             <DailyWorkspace />
           ) : mainTab === 'notepad' ? (
             <Notepad
@@ -633,10 +773,7 @@ export const Dashboard = () => {
                     {isLoading ? (
                       <div className={styles.grid}>
                         {[1, 2, 3].map((number) => (
-                          <div
-                            key={number}
-                            className={styles.skeleton}
-                          />
+                          <div key={number} className={styles.skeleton} />
                         ))}
                       </div>
                     ) : projects.length === 0 ? (
@@ -655,9 +792,7 @@ export const Dashboard = () => {
                           />
                         </svg>
 
-                        <h3 className={styles.emptyTitle}>
-                          No Projects Found
-                        </h3>
+                        <h3 className={styles.emptyTitle}>No Projects Found</h3>
 
                         <p className={styles.emptyText}>
                           There are currently no projects available for this
@@ -679,10 +814,7 @@ export const Dashboard = () => {
                   </div>
                 </>
               ) : (
-                <MinecraftVault
-                  masterPassword={masterPassword}
-                  user={user}
-                />
+                <MinecraftVault masterPassword={masterPassword} user={user} />
               )}
             </>
           )}

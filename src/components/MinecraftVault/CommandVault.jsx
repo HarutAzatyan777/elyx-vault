@@ -1,8 +1,9 @@
+import { encryptRequired } from '../../utils/securePayload.js';
 import React, { useState } from 'react';
 import { collection, addDoc, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { useAuth } from '../../hooks/useAuth.jsx';
-import { encryptData, decryptData } from '../../utils/crypto';
+import { decryptData } from '../../utils/crypto';
 import styles from './MinecraftVault.module.css';
 
 /** Preset essential Minecraft server commands */
@@ -172,7 +173,7 @@ export const CommandVault = ({ items, masterPassword, onRefresh }) => {
         desc: customDesc.trim()
       });
 
-      const encryptedCmd = encryptData(payload, masterPassword);
+      const encryptedCmd = encryptRequired(payload, masterPassword);
 
       await addDoc(collection(db, 'minecraft_vault'), {
         businessId: access.businessId,

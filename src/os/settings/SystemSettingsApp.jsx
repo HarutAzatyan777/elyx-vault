@@ -1,244 +1,403 @@
 import React, { useState } from 'react';
 import { useOS } from '../hooks/useOS.js';
+import { useSystemStatus } from '../hooks/useSystemStatus.js';
+import { useTheme } from '../../context/ThemeContext.jsx';
 import { WALLPAPER_PRESETS } from '../desktop/types.js';
-import {
-  DOCK_MODES,
-  loadAutoHide,
-  loadDockMode,
-  saveAutoHide,
-  saveDockMode,
-} from '../dock/types.js';
+import { loadAutoHide, saveAutoHide, saveDockMode } from '../dock/types.js';
 import styles from './SystemSettingsApp.module.css';
-
-export function SystemSettingsApp({ masterPassword, onLockVault, onUnlockVault }) {
-  const { settings, updateSettings, isOSMode, toggleOSMode } = useOS();
-
-  const [activeTab, setActiveTab] = useState('wallpaper');
-  const [dockMode, setDockMode] = useState(loadDockMode);
+const categories = [
+  'Appearance',
+  'Desktop and Wallpaper',
+  'Dock and Taskbar',
+  'Window Behavior',
+  'Workspaces',
+  'Notifications',
+  'Keyboard Shortcuts',
+  'Account',
+  'Privacy and Security',
+  'Storage',
+  'Connected Devices / Local Agent',
+  'About Elyx OS',
+];
+export default function SystemSettingsApp({
+  masterPassword,
+  onLockVault,
+  devices = [],
+}) {
+  const {
+    settings,
+    updateSettings,
+    workspaces,
+    activeWorkspace,
+    switchWorkspace,
+    createWorkspace,
+    renameWorkspace,
+    toggleOSMode,
+  } = useOS();
+  const { user, access, connection, sessionStatus, agentStatus } =
+    useSystemStatus();
+  const { theme } = useTheme();
+  const [active, setActive] = useState('Appearance');
   const [autoHide, setAutoHide] = useState(loadAutoHide);
-
-  const handleDockModeChange = (mode) => {
-    setDockMode(mode);
-    saveDockMode(mode);
+  const [storage, setStorage] = useState(null);
+  const [storageError, setStorageError] = useState('');
+  const select = (label, key, values) => (
+    <label className={styles.toggleRow}>
+      <strong>{label}</strong>
+      <select
+        aria-label={label}
+        value={settings[key]}
+        onChange={(e) => updateSettings({ [key]: e.target.value })}
+      >
+        {values.map(([value, name]) => (
+          <option key={value} value={value}>
+            {name}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+  const toggle = (label, key) => (
+    <label className={styles.toggleRow}>
+      <strong>{label}</strong>
+      <input
+        type="checkbox"
+        checked={settings[key]}
+        onChange={(e) => updateSettings({ [key]: e.target.checked })}
+      />
+    </label>
+  );
+  const desktop = (mode) => {
+    updateSettings({ desktopMode: mode });
+    saveDockMode(mode === 'windows' ? 'taskbar' : 'dock');
   };
-
-  const handleAutoHideChange = (enabled) => {
-    setAutoHide(enabled);
-    saveAutoHide(enabled);
-  };
-
   return (
-    <div className={styles.settingsRoot} role="region" aria-label="System Settings">
-      {/* Left Navigation Tabs */}
+    <div className={styles.settingsRoot} aria-label="System Settings">
       <aside className={styles.settingsSidebar}>
         <div className={styles.sidebarHeader}>
-          <span className={styles.sidebarTitle}>System Preferences</span>
+          <span className={styles.sidebarTitle}>Elyx OS · Settings</span>
         </div>
-
-        <nav className={styles.tabsNav}>
-          <button
-            type="button"
-            className={`${styles.tabBtn} ${activeTab === 'wallpaper' ? styles.tabActive : ''}`}
-            onClick={() => setActiveTab('wallpaper')}
-          >
-            <span>🎨</span>
-            <span>Wallpaper & Glass</span>
-          </button>
-
-          <button
-            type="button"
-            className={`${styles.tabBtn} ${activeTab === 'dock' ? styles.tabActive : ''}`}
-            onClick={() => setActiveTab('dock')}
-          >
-            <span>🪟</span>
-            <span>Dock & Taskbar</span>
-          </button>
-
-          <button
-            type="button"
-            className={`${styles.tabBtn} ${activeTab === 'security' ? styles.tabActive : ''}`}
-            onClick={() => setActiveTab('security')}
-          >
-            <span>🔒</span>
-            <span>Security & Cryptography</span>
-          </button>
-
-          <button
-            type="button"
-            className={`${styles.tabBtn} ${activeTab === 'about' ? styles.tabActive : ''}`}
-            onClick={() => setActiveTab('about')}
-          >
-            <span>ℹ️</span>
-            <span>About Elyx OS</span>
-          </button>
+        <nav className={styles.tabsNav} aria-label="Settings categories">
+          {categories.map((name) => (
+            <button
+              key={name}
+              type="button"
+              aria-current={active === name ? 'page' : undefined}
+              className={`${styles.tabBtn} ${active === name ? styles.tabActive : ''}`}
+              onClick={() => setActive(name)}
+            >
+              {name}
+            </button>
+          ))}
         </nav>
       </aside>
-
-      {/* Main Settings Content */}
       <main className={styles.settingsContent}>
-        {activeTab === 'wallpaper' && (
-          <div className={styles.section}>
-            <h2 className={styles.sectionHeading}>Desktop Wallpaper</h2>
-            <p className={styles.sectionDesc}>
-              Select a visual backdrop inspired by organic aurora waves, cosmic nebulas, and slate gradients.
-            </p>
-
-            <div className={styles.wallpaperGrid}>
-              {WALLPAPER_PRESETS.map((wp) => (
-                <button
-                  key={wp.id}
-                  type="button"
-                  className={`${styles.wallpaperCard} ${
-                    settings.wallpaperId === wp.id ? styles.cardActive : ''
-                  }`}
-                  onClick={() => updateSettings({ wallpaperId: wp.id })}
+        <section className={styles.section}>
+          <h2 className={styles.sectionHeading}>{active}</h2>
+          <p className={styles.sectionDesc}>
+            Your workspace, your preferences. Changes save on this browser.
+          </p>
+          {active === 'Appearance' && (
+            <>
+              {select('Theme', 'theme', [
+                ['light', 'Light'],
+                ['dark', 'Dark'],
+                ['system', 'Follow system'],
+              ])}
+              <label className={styles.toggleRow}>
+                <strong>Desktop mode</strong>
+                <select
+                  aria-label="Desktop mode"
+                  value={settings.desktopMode}
+                  onChange={(e) => desktop(e.target.value)}
                 >
-                  <div className={styles.previewBox} style={{ background: wp.darkCss }} />
-                  <span className={styles.wallpaperName}>{wp.name}</span>
+                  <option value="macos">macOS inspired</option>
+                  <option value="windows">Windows inspired</option>
+                  <option value="gnome">GNOME inspired</option>
+                </select>
+              </label>
+              {select('Mobile mode', 'mobileMode', [
+                ['ios', 'iOS inspired'],
+                ['android', 'Android inspired'],
+              ])}
+              <label className={styles.toggleRow}>
+                <strong>Accent color</strong>
+                <input
+                  type="color"
+                  aria-label="Accent color"
+                  value={settings.accentColor}
+                  onChange={(e) =>
+                    updateSettings({ accentColor: e.target.value })
+                  }
+                />
+              </label>
+              {toggle('Reduced motion', 'reducedMotion')}
+              <p>System motion preferences are also respected.</p>
+            </>
+          )}
+          {active === 'Desktop and Wallpaper' && (
+            <div className={styles.wallpaperGrid}>
+              {WALLPAPER_PRESETS.map((w) => (
+                <button
+                  key={w.id}
+                  type="button"
+                  aria-pressed={settings.wallpaperId === w.id}
+                  className={`${styles.wallpaperCard} ${settings.wallpaperId === w.id ? styles.cardActive : ''}`}
+                  onClick={() => updateSettings({ wallpaperId: w.id })}
+                >
+                  <div
+                    className={styles.previewBox}
+                    style={{
+                      background: theme === 'light' ? w.lightCss : w.darkCss,
+                    }}
+                  />
+                  <span className={styles.wallpaperName}>{w.name}</span>
                 </button>
               ))}
             </div>
-          </div>
-        )}
-
-        {activeTab === 'dock' && (
-          <div className={styles.section}>
-            <h2 className={styles.sectionHeading}>Dock & Taskbar Appearance</h2>
-            <p className={styles.sectionDesc}>
-              Customize the desktop interaction shell between macOS floating dock and Windows 11 taskbar.
-            </p>
-
-            <div className={styles.settingGroup}>
-              <h3 className={styles.groupHeading}>Interface Shell Style</h3>
+          )}
+          {active === 'Dock and Taskbar' && (
+            <>
               <div className={styles.modeChooser}>
-                <button
-                  type="button"
-                  className={`${styles.modeBtn} ${dockMode === DOCK_MODES.DOCK ? styles.modeActive : ''}`}
-                  onClick={() => handleDockModeChange(DOCK_MODES.DOCK)}
-                >
-                  <div className={styles.modeIcon}>🍏</div>
-                  <div className={styles.modeText}>
-                    <strong>macOS Floating Dock</strong>
-                    <span>Centered floating glass shelf with magnification</span>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  className={`${styles.modeBtn} ${dockMode === DOCK_MODES.TASKBAR ? styles.modeActive : ''}`}
-                  onClick={() => handleDockModeChange(DOCK_MODES.TASKBAR)}
-                >
-                  <div className={styles.modeIcon}>🪟</div>
-                  <div className={styles.modeText}>
-                    <strong>Windows 11 Taskbar</strong>
-                    <span>Full-width bottom bar with Start menu and system tray</span>
-                  </div>
-                </button>
+                {[
+                  ['macos', 'Floating dock'],
+                  ['windows', 'Taskbar'],
+                  ['gnome', 'GNOME overview'],
+                ].map(([mode, label]) => (
+                  <button
+                    type="button"
+                    key={mode}
+                    aria-pressed={settings.desktopMode === mode}
+                    className={styles.modeBtn}
+                    onClick={() => desktop(mode)}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
-            </div>
-
-            <div className={styles.toggleRow}>
-              <div>
-                <strong>Auto-Hide Dock / Taskbar</strong>
-                <p>Hide shelf until cursor approaches the bottom edge</p>
-              </div>
-              <button
-                type="button"
-                className={`${styles.toggleBtn} ${autoHide ? styles.toggleOn : ''}`}
-                onClick={() => handleAutoHideChange(!autoHide)}
-              >
-                {autoHide ? 'Enabled' : 'Disabled'}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'security' && (
-          <div className={styles.section}>
-            <h2 className={styles.sectionHeading}>Zero-Knowledge Cryptography</h2>
-            <p className={styles.sectionDesc}>
-              Elyx OS operates under strict client-side zero-knowledge encryption. Decryption keys reside purely in transient memory.
-            </p>
-
-            <div className={styles.statusBox}>
-              <div className={styles.statusRow}>
-                <span>Vault Status:</span>
-                <span className={masterPassword ? styles.unlockedText : styles.lockedText}>
-                  {masterPassword ? '🔓 Unlocked (Active Session)' : '🔒 Locked'}
-                </span>
-              </div>
-              <div className={styles.statusRow}>
-                <span>Cipher Algorithm:</span>
-                <span className={styles.cipherText}>AES-256-CBC • PBKDF2 (10,000 iterations)</span>
-              </div>
-              <div className={styles.statusRow}>
-                <span>Cloud Storage:</span>
-                <span className={styles.cipherText}>Ciphertext only (Zero-Knowledge)</span>
-              </div>
-            </div>
-
-            {masterPassword ? (
-              <button
-                type="button"
-                className={styles.dangerBtn}
-                onClick={onLockVault}
-              >
-                🔒 Lock Vault & Purge Keys Immediately
-              </button>
-            ) : (
+              <label className={styles.toggleRow}>
+                Auto hide
+                <input
+                  type="checkbox"
+                  checked={autoHide}
+                  onChange={(e) => {
+                    setAutoHide(e.target.checked);
+                    saveAutoHide(e.target.checked);
+                  }}
+                />
+              </label>
+            </>
+          )}
+          {active === 'Window Behavior' && (
+            <>
+              {toggle('Window snapping', 'windowSnapEnabled')}
+              {toggle('Animations', 'animationsEnabled')}
+            </>
+          )}
+          {active === 'Workspaces' && (
+            <>
+              {workspaces.map((w) => (
+                <div className={styles.toggleRow} key={w.id}>
+                  <input
+                    aria-label={`Workspace ${w.id} name`}
+                    value={w.name}
+                    onChange={(e) => renameWorkspace(w.id, e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    disabled={activeWorkspace === w.id}
+                    onClick={() => switchWorkspace(w.id)}
+                  >
+                    {activeWorkspace === w.id ? 'Current' : 'Switch'}
+                  </button>
+                </div>
+              ))}
               <button
                 type="button"
                 className={styles.primaryBtn}
-                onClick={onUnlockVault}
+                onClick={() => createWorkspace()}
               >
-                🔓 Enter Master Password to Decrypt
+                Add workspace
               </button>
-            )}
-          </div>
-        )}
-
-        {activeTab === 'about' && (
-          <div className={styles.section}>
-            <h2 className={styles.sectionHeading}>Elyx OS 1.0</h2>
-            <p className={styles.sectionDesc}>
-              Personal Cloud Operating System integrating desktop window management, zero-knowledge security, and local daemons.
-            </p>
-
-            <div className={styles.specGrid}>
-              <div className={styles.specCard}>
-                <span>Frontend Framework</span>
-                <strong>React 19 • Vite 8</strong>
-              </div>
-              <div className={styles.specCard}>
-                <span>Backend Services</span>
-                <strong>Firebase 12 • Firestore • RTDB</strong>
-              </div>
-              <div className={styles.specCard}>
-                <span>Terminal Engine</span>
-                <strong>xterm.js • WebSocket Daemon</strong>
-              </div>
-              <div className={styles.specCard}>
-                <span>Window Server</span>
-                <strong>Elyx Quartz Multi-Window Stage</strong>
-              </div>
+            </>
+          )}
+          {active === 'Notifications' && (
+            <>
+              {toggle('In-app notifications', 'notificationsEnabled')}
+              {toggle('Hide notification previews', 'notificationPrivacy')}
+              {['system', 'security', 'media', 'workspace', 'devices'].map(
+                (category) => (
+                  <label className={styles.toggleRow} key={category}>
+                    {category}
+                    <input
+                      type="checkbox"
+                      aria-label={`${category} notifications`}
+                      checked={
+                        !settings.disabledNotificationCategories.includes(
+                          category,
+                        )
+                      }
+                      onChange={(e) =>
+                        updateSettings({
+                          disabledNotificationCategories: e.target.checked
+                            ? settings.disabledNotificationCategories.filter(
+                                (c) => c !== category,
+                              )
+                            : [
+                                ...settings.disabledNotificationCategories,
+                                category,
+                              ],
+                        })
+                      }
+                    />
+                  </label>
+                ),
+              )}
+              <p>
+                Notifications stay in memory and clear when you sign out or lock
+                the vault. No browser notification permission is requested.
+              </p>
+            </>
+          )}
+          {active === 'Notifications' && (
+            <button
+              type="button"
+              className={styles.primaryBtn}
+              onClick={() =>
+                window.dispatchEvent(new Event('elyx:open-notifications'))
+              }
+            >
+              Open notification center
+            </button>
+          )}
+          {active === 'Keyboard Shortcuts' && (
+            <dl>
+              <dt>Command search</dt>
+              <dd>Ctrl / ⌘ + K</dd>
+              <dt>App launcher</dt>
+              <dd>Ctrl / ⌘ + Space</dd>
+              <dt>Switch workspace</dt>
+              <dd>Ctrl + Left / Right</dd>
+              <dt>Close a panel</dt>
+              <dd>Escape</dd>
+              <dt>Navigate controls</dt>
+              <dd>Tab / Shift + Tab</dd>
+            </dl>
+          )}
+          {active === 'Account' && (
+            <div className={styles.statusBox}>
+              <p>{user?.displayName || 'Authenticated account'}</p>
+              <p>{user?.email || 'Signed out'}</p>
+              <p>
+                Account ID: <code>{user?.uid || 'Unavailable'}</code>
+              </p>
+              <p>Role: {access?.role || 'Unavailable'}</p>
+              <p>Work session: {sessionStatus}</p>
             </div>
-
-            <div className={styles.classicSwitchSection}>
-              <h3>Desktop Environment Switcher</h3>
-              <p>You can toggle back to the classic dashboard at any time without data loss.</p>
+          )}
+          {active === 'Privacy and Security' && (
+            <>
+              <p>
+                Vault: {masterPassword ? 'Unlocked' : 'Locked'}. The password
+                stays in memory; reloading requires unlocking again.
+              </p>
+              <label className={styles.toggleRow}>
+                Lock after inactivity
+                <select
+                  aria-label="Auto lock timeout"
+                  value={settings.autoLockMinutes}
+                  onChange={(e) =>
+                    updateSettings({ autoLockMinutes: Number(e.target.value) })
+                  }
+                >
+                  {[1, 5, 15, 30, 60].map((n) => (
+                    <option key={n} value={n}>
+                      {n} minutes
+                    </option>
+                  ))}
+                </select>
+              </label>
               <button
                 type="button"
-                className={styles.classicBtn}
+                className={styles.dangerBtn}
+                disabled={!masterPassword}
+                onClick={onLockVault}
+              >
+                Lock vault
+              </button>
+            </>
+          )}
+          {active === 'Storage' && (
+            <>
+              <p>
+                Browser storage estimate, including this origin’s cached files.
+                Cloud quota is unavailable.
+              </p>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    if (!navigator.storage?.estimate)
+                      throw Error(
+                        'Storage estimates are unavailable in this browser.',
+                      );
+                    setStorage(await navigator.storage.estimate());
+                  } catch (e) {
+                    setStorageError(e.message);
+                  }
+                }}
+              >
+                Check storage
+              </button>
+              <p role="status">
+                {storage
+                  ? `${((storage.usage || 0) / 1048576).toFixed(1)} MB used / ${((storage.quota || 0) / 1048576).toFixed(1)} MB quota`
+                  : storageError}
+              </p>
+            </>
+          )}
+          {active === 'Connected Devices / Local Agent' && (
+            <>
+              <p>Firebase Realtime Database: {connection}</p>
+              <p>
+                Firestore connection is not inferred from the Realtime Database
+                connection.
+              </p>
+              <p>
+                Local Agent: {agentStatus}. Availability is measured by the
+                terminal WebSocket.
+              </p>
+              {devices.map((d) => (
+                <p key={d.id}>
+                  {d.name} · Registered device ({d.status || 'status unknown'}{' '}
+                  reported)
+                </p>
+              ))}
+              {!devices.length && <p>No registered devices available.</p>}
+            </>
+          )}
+          {active === 'About Elyx OS' && (
+            <>
+              <h3>Elyx OS 1.0</h3>
+              <p>A personal cloud workspace built with React and Firebase.</p>
+              <p>
+                Desktop and mobile modes change the Elyx interface. Audio
+                controls affect Elyx playback. Browser APIs cannot control
+                system Wi-Fi, hardware volume, or device settings.
+              </p>
+              <button
+                type="button"
+                className={styles.primaryBtn}
                 onClick={toggleOSMode}
               >
-                ⚡ Switch to Classic Dashboard
+                Switch to classic dashboard
               </button>
-            </div>
-          </div>
-        )}
+            </>
+          )}
+        </section>
       </main>
     </div>
   );
 }
 
-export default SystemSettingsApp;
+export { SystemSettingsApp };

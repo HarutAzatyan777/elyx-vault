@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { useFlyoutFocus } from '../hooks/useFlyoutFocus.js';
+const SystemSettingsApp = lazy(() => import('../settings/SystemSettingsApp.jsx'));
+import React, { lazy, useCallback, useEffect, useState, useRef } from 'react';
 import { useOS } from '../hooks/useOS.js';
 import { useWindowManager } from '../hooks/useWindowManager.js';
-import { WALLPAPER_PRESETS } from '../desktop/types.js';
 import TopBar from './TopBar.jsx';
 import DesktopCanvas from '../desktop/DesktopCanvas.jsx';
 import WindowManagerStage from '../windows/WindowManagerStage.jsx';
@@ -11,15 +12,12 @@ import CommandPalette from '../launcher/CommandPalette.jsx';
 import WorkspaceOverview from '../workspaces/WorkspaceOverview.jsx';
 import AppSwitcher from '../windows/AppSwitcher.jsx';
 import {
-  DOCK_MODES,
   loadAutoHide,
-  loadDockMode,
-  saveAutoHide,
-  saveDockMode,
 } from '../dock/types.js';
 import styles from './DesktopShell.module.css';
 
 export function DesktopShell({
+  systemNotice,
   user,
   access,
   projects = [],
@@ -42,7 +40,6 @@ export function DesktopShell({
   const {
     toggleOSMode,
     settings,
-    updateSettings,
     workspaces,
     activeWorkspace,
     switchWorkspace,
@@ -65,11 +62,29 @@ export function DesktopShell({
   // Modals & Flyouts
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const settingsRef = useRef(null);
+  const closeSettings = useCallback(() => setIsSettingsOpen(false), []);
+  useFlyoutFocus(isSettingsOpen, settingsRef, closeSettings);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isAppSwitcherOpen, setIsAppSwitcherOpen] = useState(false);
 
+  useEffect(() => {
+    setCurrentDockMode(settings.desktopMode === 'windows' ? 'taskbar' : 'dock');
+  }, [settings.desktopMode]);
+
+  useEffect(() => {
+    const sync = () => setCurrentAutoHide(loadAutoHide());
+    window.addEventListener('elyx:dock-changed', sync);
+    return () => window.removeEventListener('elyx:dock-changed', sync);
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener('elyx:open-notifications', closeSettings);
+    return () => window.removeEventListener('elyx:open-notifications', closeSettings);
+  }, [closeSettings]);
+
   // Dock Preferences in state for reactive settings modal updates
-  const [currentDockMode, setCurrentDockMode] = useState(loadDockMode);
+  const [currentDockMode, setCurrentDockMode] = useState(() => settings.desktopMode === 'windows' ? 'taskbar' : 'dock');
   const [currentAutoHide, setCurrentAutoHide] = useState(loadAutoHide);
 
   const handleOpenApp = useCallback(
@@ -159,18 +174,9 @@ export function DesktopShell({
     windows.length,
   ]);
 
-  const handleSwitchDockMode = (newMode) => {
-    setCurrentDockMode(newMode);
-    saveDockMode(newMode);
-  };
-
-  const handleToggleAutoHide = (enabled) => {
-    setCurrentAutoHide(enabled);
-    saveAutoHide(enabled);
-  };
-
   return (
     <div className={styles.desktopShellRoot}>
+      {systemNotice && <div role="status" style={{position:'fixed',top:48,left:'50%',transform:'translateX(-50%)',zIndex:2000,background:'var(--elyx-surface-window-body)',color:'var(--elyx-text-primary)',padding:'10px 16px',borderRadius:12,maxWidth:'90vw'}}>{systemNotice}</div>}
       {/* Top macOS-style System Bar */}
       <TopBar
         user={user}
@@ -300,7 +306,7 @@ export function DesktopShell({
               </div>
               <div className={styles.aboutRow}>
                 <span>Cryptography</span>
-                <span>Zero-Knowledge AES-256 Memory Guard</span>
+                <span>Client-side passphrase encryption</span>
               </div>
               <div className={styles.aboutRow}>
                 <span>Local Daemon</span>
@@ -321,153 +327,19 @@ export function DesktopShell({
       {/* System Settings Modal */}
       {isSettingsOpen && (
         <div className={styles.modalOverlay} onClick={() => setIsSettingsOpen(false)}>
-          <div className={styles.settingsModal} onClick={(e) => e.stopPropagation()}>
+          <div ref={settingsRef} role="dialog" aria-label="System Settings" className={styles.settingsModal} onClick={(e) => e.stopPropagation()}>
             <div className={styles.settingsHeader}>
               <h2 className={styles.settingsTitle}>System Settings</h2>
               <button
                 type="button"
-                className={styles.modalCloseBtn}
+                aria-label="Close dialog" className={styles.modalCloseBtn}
                 onClick={() => setIsSettingsOpen(false)}
               >
                 ×
               </button>
             </div>
 
-            {/* Desktop Wallpaper */}
-            <div className={styles.settingsSection}>
-              <h3 className={styles.settingsSectionTitle}>Desktop Wallpaper</h3>
-              <div className={styles.wallpaperGrid}>
-                {WALLPAPER_PRESETS.map((wp) => (
-                  <button
-                    key={wp.id}
-                    type="button"
-                    className={`${styles.wallpaperCard} ${
-                      settings.wallpaperId === wp.id ? styles.wallpaperActive : ''
-                    }`}
-                    onClick={() => updateSettings({ wallpaperId: wp.id })}
-                  >
-                    <div
-                      className={styles.wallpaperPreview}
-                      style={{ background: wp.darkCss }}
-                    />
-                    <span className={styles.wallpaperName}>{wp.name}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Dock & Taskbar Mode Preference */}
-            <div className={styles.settingsSection}>
-              <h3 className={styles.settingsSectionTitle}>Dock & Taskbar Style</h3>
-              <p className={styles.settingsDesc}>
-                Choose between the macOS-inspired floating Dock or the Windows 11-style bottom Taskbar.
-              </p>
-              <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-                <button
-                  type="button"
-                  style={{
-                    flex: 1,
-                    padding: '10px',
-                    borderRadius: '10px',
-                    border: currentDockMode === DOCK_MODES.DOCK ? '2px solid #6366f1' : '1px solid rgba(255,255,255,0.12)',
-                    background: currentDockMode === DOCK_MODES.DOCK ? 'rgba(99, 102, 241, 0.2)' : 'rgba(255,255,255,0.04)',
-                    color: '#ffffff',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                  }}
-                  onClick={() => handleSwitchDockMode(DOCK_MODES.DOCK)}
-                >
-                  🍏 macOS Floating Dock
-                </button>
-                <button
-                  type="button"
-                  style={{
-                    flex: 1,
-                    padding: '10px',
-                    borderRadius: '10px',
-                    border: currentDockMode === DOCK_MODES.TASKBAR ? '2px solid #6366f1' : '1px solid rgba(255,255,255,0.12)',
-                    background: currentDockMode === DOCK_MODES.TASKBAR ? 'rgba(99, 102, 241, 0.2)' : 'rgba(255,255,255,0.04)',
-                    color: '#ffffff',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                  }}
-                  onClick={() => handleSwitchDockMode(DOCK_MODES.TASKBAR)}
-                >
-                  🪟 Windows 11 Taskbar
-                </button>
-              </div>
-
-              <div style={{ marginTop: '14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '0.85rem', color: '#ffffff' }}>Auto-Hide Dock</span>
-                <button
-                  type="button"
-                  style={{
-                    padding: '5px 12px',
-                    borderRadius: '8px',
-                    border: '1px solid rgba(255,255,255,0.15)',
-                    background: currentAutoHide ? '#6366f1' : 'rgba(255,255,255,0.08)',
-                    color: '#ffffff',
-                    cursor: 'pointer',
-                    fontSize: '0.8rem',
-                    fontWeight: 600,
-                  }}
-                  onClick={() => handleToggleAutoHide(!currentAutoHide)}
-                >
-                  {currentAutoHide ? 'Enabled' : 'Disabled'}
-                </button>
-              </div>
-            </div>
-
-            {/* Zero-Knowledge Security */}
-            <div className={styles.settingsSection}>
-              <h3 className={styles.settingsSectionTitle}>Zero-Knowledge Security</h3>
-              <p className={styles.settingsDesc}>
-                Master password keys are stored in transient session memory and never transmitted to servers.
-              </p>
-              {masterPassword ? (
-                <button
-                  type="button"
-                  className={styles.lockNowBtn}
-                  onClick={() => {
-                    handleLockVault();
-                    setIsSettingsOpen(false);
-                  }}
-                >
-                  🔒 Lock Vault Immediately
-                </button>
-              ) : (
-                <span className={styles.vaultLockedBadge}>Vault is currently locked</span>
-              )}
-            </div>
-
-            {/* System Environment */}
-            <div className={styles.settingsSection}>
-              <h3 className={styles.settingsSectionTitle}>System Environment</h3>
-              <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
-                <button
-                  type="button"
-                  className={styles.classicSwitchBtn}
-                  style={{ flex: 1 }}
-                  onClick={() => {
-                    toggleOSMode();
-                    setIsSettingsOpen(false);
-                  }}
-                >
-                  ⚡ Classic Dashboard
-                </button>
-                <button
-                  type="button"
-                  className={styles.classicSwitchBtn}
-                  style={{ flex: 1, background: 'rgba(99, 102, 241, 0.25)', borderColor: '#6366f1' }}
-                  onClick={() => {
-                    onSwitchToMobile?.();
-                    setIsSettingsOpen(false);
-                  }}
-                >
-                  📱 Mobile OS Experience
-                </button>
-              </div>
-            </div>
+            <SystemSettingsApp masterPassword={masterPassword} onLockVault={handleLockVault} devices={devices} />
           </div>
         </div>
       )}

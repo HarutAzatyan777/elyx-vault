@@ -10,5 +10,11 @@
   "maxConcurrentSessions": 3,
   "idleTimeoutSeconds": 900,
   "maxSessionDurationSeconds": 14400,
-  "defaultShell": "powershell.exe"
+  "defaultShell": "powershell.exe",
+  "authorizedUserIds": ["REPLACE_WITH_YOUR_FIREBASE_AUTH_UID"],
+  "host": "127.0.0.1",
+  "allowedOrigins": [
+    "http://localhost:5173",
+    "https://elyx-vault.web.app"
+  ]
 }

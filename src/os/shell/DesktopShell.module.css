@@ -123,7 +123,8 @@
 
 /* System Settings Modal */
 .settingsModal {
-  width: min(540px, 92vw);
+  width: min(960px, 94vw);
+  height: min(720px, 85vh);
   background: var(--elyx-surface-modal, rgba(11, 18, 36, 0.96));
   backdrop-filter: var(--elyx-glass-blur-lg, blur(36px));
   -webkit-backdrop-filter: var(--elyx-glass-blur-lg, blur(36px));
@@ -265,3 +266,5 @@
   font-weight: 600;
   color: var(--elyx-status-warning, #f59e0b);
 }
+
+.settingsModal > :last-child { min-height: 0; flex: 1; }

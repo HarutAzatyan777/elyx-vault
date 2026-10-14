@@ -1335,3 +1335,8 @@
 .contextActionItem:hover {
   background: rgba(255, 255, 255, 0.08);
 }
+
+.quickSettingsSheet { max-height: calc(100dvh - 24px); overflow-y: auto; }
+
+:global([data-theme='light']) .quickSettingsSheet { background: rgba(248, 250, 252, 0.97); color: #0f172a; }
+:global([data-theme='light']) .quickUserName, :global([data-theme='light']) .tileLabel { color: #0f172a; }

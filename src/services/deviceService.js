@@ -27,8 +27,8 @@ export function subscribeToDevices(uid, onData, onError) {
     q,
     (snapshot) => {
       const devices = snapshot.docs.map((docSnap) => ({
-        id: docSnap.id,
         ...docSnap.data(),
+            id: docSnap.id,
       }));
       onData(devices);
     },
@@ -52,8 +52,8 @@ export function subscribeToSecurityEvents(uid, onData, onError) {
     q,
     (snapshot) => {
       const events = snapshot.docs.map((docSnap) => ({
-        id: docSnap.id,
         ...docSnap.data(),
+            id: docSnap.id,
       }));
       onData(events);
     },
@@ -69,6 +69,7 @@ export async function registerDevice(uid, deviceData) {
 
   const newDevice = {
     uid,
+    deviceId: typeof deviceData.deviceId === 'string' ? deviceData.deviceId : '',
     name: deviceData.name || 'Windows Home PC',
     platform: deviceData.platform || 'win32',
     arch: deviceData.arch || 'x64',
@@ -76,9 +77,9 @@ export async function registerDevice(uid, deviceData) {
     agentPort: deviceData.agentPort || 9090,
     tailscaleIp: deviceData.tailscaleIp || '127.0.0.1',
     tailscaleDomain: deviceData.tailscaleDomain || '',
-    status: 'online',
+    status: 'unknown',
     enrollmentState: 'approved',
-    lastSeenAt: Date.now(),
+    lastSeenAt: null,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };

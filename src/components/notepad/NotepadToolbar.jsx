@@ -303,7 +303,7 @@ export const NotepadToolbar = ({
           onClick={onToggleEncrypt}
           title={
             isEncrypted
-              ? 'Note is Encrypted with AES-256 (Zero-Knowledge)'
+              ? 'Note content is encrypted with your vault password'
               : 'Encrypt Note with Master Password / Գաղտնագրել'
           }
         >

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { getAppById } from '../registry/appRegistry.js';
+import { getAppById, canUserLaunchApp } from '../registry/appRegistry.js';
 import { useWindowManager } from '../hooks/useWindowManager.js';
 import { useOS } from '../hooks/useOS.js';
 import {
@@ -29,8 +29,14 @@ export function Dock({
     closeWindow,
   } = useWindowManager();
 
-  const { isLauncherOpen, toggleLauncher, toggleOverview } = useOS();
+  const { settings, updateSettings, isLauncherOpen, toggleLauncher, toggleOverview } = useOS();
 
+  useEffect(() => setDockMode(settings.desktopMode === 'windows' ? 'taskbar' : 'dock'), [settings.desktopMode]);
+  useEffect(() => {
+    const sync = () => setAutoHide(loadAutoHide());
+    window.addEventListener('elyx:dock-changed', sync);
+    return () => window.removeEventListener('elyx:dock-changed', sync);
+  }, []);
   // Dock Preferences State
   const [pinnedAppIds, setPinnedAppIds] = useState(loadPinnedApps);
   const [dockMode, setDockMode] = useState(loadDockMode);
@@ -50,7 +56,8 @@ export function Dock({
   const updateMode = useCallback((newMode) => {
     setDockMode(newMode);
     saveDockMode(newMode);
-  }, []);
+    updateSettings({ desktopMode: newMode === 'taskbar' ? 'windows' : 'macos' });
+  }, [updateSettings]);
 
   const updateAutoHide = useCallback((enabled) => {
     setAutoHide(enabled);
@@ -143,7 +150,7 @@ export function Dock({
   // Render an individual App Icon
   const renderDockItem = (appId, isUnpinned = false) => {
     const app = getAppById(appId);
-    if (!app) return null;
+    if (!app || !canUserLaunchApp(app, userRole)) return null;
 
     const isRunning = runningAppIds.includes(appId);
     const isActive = activeWindow?.appId === appId;
@@ -409,7 +416,7 @@ export function Dock({
     if (!contextMenu) return null;
 
     const app = getAppById(contextMenu.appId);
-    if (!app) return null;
+    if (!app || !canUserLaunchApp(app, userRole)) return null;
 
     const isRunning = runningAppIds.includes(contextMenu.appId);
     const isPinned = pinnedAppIds.includes(contextMenu.appId);

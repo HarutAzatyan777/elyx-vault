@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Elyx Vault Extension",
-  "version": "1.4.0",
-  "description": "Zero-knowledge password vault extension with isolated multi-account auto-login.",
+  "version": "1.4.1",
+  "description": "Password vault with client-side credential encryption and origin-bound autofill.",
   "permissions": [
     "activeTab",
     "scripting",
@@ -20,7 +20,8 @@
     "matches": [
       "http://localhost/*",
       "http://127.0.0.1/*",
-      "https://*/*"
+      "https://elyx-vault.web.app/*",
+      "https://elyx-vault.firebaseapp.com/*"
     ]
   },
   "incognito": "spanning",
@@ -35,7 +36,10 @@
         "http://localhost/*",
         "http://127.0.0.1/*"
       ],
-      "js": ["content.js"],
+      "js": [
+        "securityPolicy.js",
+        "content.js"
+      ],
       "run_at": "document_start"
     }
   ],

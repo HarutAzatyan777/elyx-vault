@@ -12,7 +12,7 @@ export function validateDirectoryPath(requestedPath, allowedDirectories = []) {
 
   try {
     // Resolve absolute normalized path
-    const normalizedTarget = path.normalize(path.resolve(requestedPath));
+    const normalizedTarget = fs.realpathSync(path.resolve(requestedPath));
 
     // Check if target directory exists on disk
     if (!fs.existsSync(normalizedTarget)) {
@@ -26,12 +26,13 @@ export function validateDirectoryPath(requestedPath, allowedDirectories = []) {
 
     // Default fallback if no allowed list configured: default to process cwd or root drive
     if (!allowedDirectories || allowedDirectories.length === 0) {
-      return { valid: true, resolvedPath: normalizedTarget };
+      return { valid: false, error: 'No authorized directories configured' };
     }
 
     // Check if requested path is inside or equals any allowed directory
     const isAllowed = allowedDirectories.some((allowedDir) => {
-      const normalizedAllowed = path.normalize(path.resolve(allowedDir));
+      let normalizedAllowed;
+      try { normalizedAllowed = fs.realpathSync(path.resolve(allowedDir)); } catch { return false; }
       const relative = path.relative(normalizedAllowed, normalizedTarget);
       return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
     });

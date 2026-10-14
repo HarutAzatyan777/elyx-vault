@@ -68,13 +68,7 @@ export function useDailyWorkspace() {
           uid,
           (data) => {
             setPresets(data);
-            if (!selectedPresetId && data.length > 0) {
-              // Select first favorite or first preset by default
-              const fav = data.find((p) => p.isFavorite) || data[0];
-              setSelectedPresetId(fav?.id || null);
-            } else if (data.length === 0) {
-              setSelectedPresetId(null);
-            }
+            setSelectedPresetId(current => data.some(preset => preset.id === current) ? current : (data.find(preset => preset.isFavorite) || data[0])?.id || null);
             setLoading(false);
           },
           (err) => {

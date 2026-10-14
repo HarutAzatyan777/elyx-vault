@@ -37,6 +37,7 @@ export function TopBar({
   } = useWindowManager();
 
   const {
+    settings,
     workspaces,
     activeWorkspace,
     switchWorkspace,
@@ -66,11 +67,16 @@ export function TopBar({
   const { currentTrack, isPlaying, togglePlayPause } = useMusic();
 
   // Notification count
-  const { notifications } = useNotifications();
+  const { unreadCount } = useNotifications();
 
   // Active flyout states
   const [activeMenu, setActiveMenu] = useState(null);
 
+  useEffect(() => {
+    const open = () => setActiveMenu('notifications');
+    window.addEventListener('elyx:open-notifications', open);
+    return () => window.removeEventListener('elyx:open-notifications', open);
+  }, []);
   const handleToggleMenu = (menuKey) => {
     setActiveMenu((prev) => (prev === menuKey ? null : menuKey));
   };
@@ -126,6 +132,7 @@ export function TopBar({
         </div>
 
         {/* Contextual Application Menus (macOS style) */}
+        {settings.desktopMode === 'gnome' && <button type="button" className={styles.appMenuBtn} onClick={toggleOverview}>Activities</button>}
         <nav className={styles.appMenusNav} aria-label="Application menus">
           <button
             type="button"
@@ -225,7 +232,7 @@ export function TopBar({
             type="button"
             className={styles.lockStatusBtn}
             onClick={onLockVault}
-            title="Zero-Knowledge Vault is Decrypted. Click to Lock immediately."
+            title="Elyx Vault is Decrypted. Click to Lock immediately."
           >
             <span className={styles.lockIcon}>🔓</span>
             <span className={styles.lockLabel}>Lock</span>
@@ -279,7 +286,9 @@ export function TopBar({
           className={`${styles.iconButton} ${activeMenu === 'notifications' ? styles.btnActive : ''}`}
           onClick={() => handleToggleMenu('notifications')}
           title="Notification Center"
-          aria-label="Notifications"
+          aria-label={`Notifications, ${unreadCount} unread`}
+          aria-expanded={activeMenu === 'notifications'}
+          aria-haspopup="dialog"
         >
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="16" height="16">
             <path
@@ -289,8 +298,8 @@ export function TopBar({
               d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
             />
           </svg>
-          {notifications.length > 0 && (
-            <span className={styles.notifBadge}>{notifications.length}</span>
+          {unreadCount > 0 && (
+            <span className={styles.notifBadge}>{unreadCount}</span>
           )}
         </button>
 
@@ -307,6 +316,8 @@ export function TopBar({
           onClick={() => handleToggleMenu('control')}
           title={`Control Center (${userName} - ${access?.role || 'viewer'})`}
           aria-label="User Profile and Control Center"
+          aria-expanded={activeMenu === 'control'}
+          aria-haspopup="dialog"
         >
           <div className={styles.avatarCircle}>{userName.charAt(0).toUpperCase()}</div>
         </button>

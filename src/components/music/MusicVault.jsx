@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { usePagedItems } from '../../os/hooks/usePagedItems.js';
+import LibraryPagination from '../../os/shell/LibraryPagination.jsx';
+import React, { useState, useDeferredValue, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../../hooks/useAuth.jsx';
 import { useMusic } from '../../context/MusicContext';
 import {
@@ -53,6 +55,7 @@ export const MusicVault = ({ masterPassword, onUnlockVault }) => {
     }
   });
   const [searchQuery, setSearchQuery] = useState('');
+  const deferredSearch = useDeferredValue(searchQuery);
   const [sortBy, setSortBy] = useState('newest'); // 'newest' | 'title' | 'artist' | 'duration'
 
   // Persist selected folder & genre in session so refreshing stays in current folder
@@ -74,6 +77,7 @@ export const MusicVault = ({ masterPassword, onUnlockVault }) => {
 
   // Drag and drop overlay state
   const [isWindowDragging, setIsWindowDragging] = useState(false);
+  const dropSurfaceRef = useRef(null);
   const dragCounterRef = useRef(0);
 
   // Modals & Toast
@@ -269,16 +273,18 @@ export const MusicVault = ({ masterPassword, onUnlockVault }) => {
       }
     };
 
-    window.addEventListener('dragenter', handleDragEnter);
-    window.addEventListener('dragleave', handleDragLeave);
-    window.addEventListener('dragover', handleDragOver);
-    window.addEventListener('drop', handleDrop);
+    const surface = dropSurfaceRef.current;
+    if (!surface) return;
+    surface.addEventListener('dragenter', handleDragEnter);
+    surface.addEventListener('dragleave', handleDragLeave);
+    surface.addEventListener('dragover', handleDragOver);
+    surface.addEventListener('drop', handleDrop);
 
     return () => {
-      window.removeEventListener('dragenter', handleDragEnter);
-      window.removeEventListener('dragleave', handleDragLeave);
-      window.removeEventListener('dragover', handleDragOver);
-      window.removeEventListener('drop', handleDrop);
+      surface.removeEventListener('dragenter', handleDragEnter);
+      surface.removeEventListener('dragleave', handleDragLeave);
+      surface.removeEventListener('dragover', handleDragOver);
+      surface.removeEventListener('drop', handleDrop);
     };
   }, [uid, businessId, folders, selectedFolderId]);
 
@@ -368,15 +374,10 @@ export const MusicVault = ({ masterPassword, onUnlockVault }) => {
 
   // Handle Save from AddTrackModal (Batch)
   const handleSaveBatchTracks = async (batch) => {
-    showToast(`☁️ Վերբեռնվում է ${batch.length} երգ Firebase Storage...`, 'info');
+    showToast(`Saving ${batch.length} tracks…`, 'info');
     const saved = await saveBatchTrackItems(batch, uid, businessId);
     setTracks((prev) => [...saved, ...prev.filter((t) => !saved.some((s) => s.id === t.id))]);
-    showToast(
-      saved.length > 1
-        ? `✨ ${saved.length} երգ հաջողությամբ պահպանվեց Firebase Storage-ում!`
-        : '✨ Երգը հաջողությամբ պահպանվեց Firebase Storage-ում!',
-      'success'
-    );
+    showToast(`${saved.length} tracks saved.${saved.some(track => track._encryptedLocalPayload) ? ' Encrypted files are stored on this device only.' : ''}`, 'success');
   };
 
   // Handle Create Folder
@@ -457,8 +458,8 @@ export const MusicVault = ({ masterPassword, onUnlockVault }) => {
     }
 
     // Search query
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
+    if (deferredSearch.trim()) {
+      const q = deferredSearch.toLowerCase();
       result = result.filter(
         (t) =>
           (t.title || '').toLowerCase().includes(q) ||
@@ -481,7 +482,9 @@ export const MusicVault = ({ masterPassword, onUnlockVault }) => {
     }
 
     return result;
-  }, [tracks, selectedFolderId, folders, selectedGenre, searchQuery, sortBy]);
+  }, [tracks, selectedFolderId, folders, selectedGenre, deferredSearch, sortBy]);
+
+  const pagination = usePagedItems(processedTracks);
 
   // Total stats
   const totalStats = useMemo(() => {
@@ -503,7 +506,8 @@ export const MusicVault = ({ masterPassword, onUnlockVault }) => {
   };
 
   return (
-    <div className={styles.container}>
+    <div ref={dropSurfaceRef} className={styles.container}>
+      <LibraryPagination pagination={pagination} />
       {/* Toast Notification */}
       {toastMessage && (
         <div
@@ -915,7 +919,7 @@ export const MusicVault = ({ masterPassword, onUnlockVault }) => {
                 </tr>
               </thead>
               <tbody>
-                {processedTracks.map((track, index) => {
+                {pagination.items.map((track, index) => {
                   const isCurrent = currentTrack?.id === track.id;
                   const isCurrentPlaying = isCurrent && isPlaying;
 

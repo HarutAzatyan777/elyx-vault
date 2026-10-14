@@ -10,21 +10,19 @@
    * Synchronously cached credentials payload to avoid async promise lookup delays
    * during rapid SPA step transitions.
    */
+  const timers = new Set();
+  const observers = new Set();
+  const trackedTimeout = (callback, delay) => { const id = setTimeout(() => { timers.delete(id); callback(); }, delay); timers.add(id); return id; };
+  const trackedInterval = (callback, delay) => { const id = setInterval(callback, delay); timers.add(id); return id; };
+  const createObserver = callback => { const observer = new MutationObserver(callback); observers.add(observer); return observer; };
+  const clearCredentials = () => { cachedCredentials = {email:'',password:''}; for (const id of timers) { clearTimeout(id); clearInterval(id); } timers.clear(); for (const observer of observers) observer.disconnect(); observers.clear(); };
   let cachedCredentials = { email: '', password: '' };
 
-  // Hydrate synchronous cache from sessionStorage if available across page redirects
-  try {
-    const saved = sessionStorage.getItem('__elyx_cached_creds');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (parsed && (parsed.email || parsed.password)) {
-        cachedCredentials = parsed;
-      }
-    }
-  } catch (e) {}
+  try { sessionStorage.removeItem('__elyx_cached_creds'); } catch {}
+  trackedTimeout(() => { cachedCredentials = {email:'',password:''}; }, 60000);
 
   /**
-   * Updates in-memory synchronous credentials cache and syncs to sessionStorage.
+   * Updates in-memory synchronous credentials cache and keeps credentials only in isolated script memory.
    *
    * @param {{ email?: string, username?: string, password?: string }} credentials
    */
@@ -34,9 +32,7 @@
     if (credentials.username && !cachedCredentials.email) cachedCredentials.email = credentials.username;
     if (credentials.password) cachedCredentials.password = credentials.password;
 
-    try {
-      sessionStorage.setItem('__elyx_cached_creds', JSON.stringify(cachedCredentials));
-    } catch (e) {}
+
   }
 
   /**
@@ -48,7 +44,7 @@
    */
   function fillInputValue(element, value) {
     if (!element || value === undefined || value === null || value === '') return;
-    
+
     try {
       element.focus();
     } catch (e) {}
@@ -215,7 +211,7 @@
           emailFilled = true;
           fillInputValue(el, rawEmail);
 
-          setTimeout(() => {
+          trackedTimeout(() => {
             const nextBtn = document.querySelector('#identifierNext button, #identifierNext, button[type="submit"], button[data-primary-action="true"]');
             if (nextBtn) {
               clickElement(nextBtn);
@@ -245,7 +241,7 @@
       }
     };
 
-    const pollInterval = setInterval(() => {
+    const pollInterval = trackedInterval(() => {
       attempts++;
       if (tryFillEmail() || attempts >= maxAttempts) {
         cleanup();
@@ -255,7 +251,7 @@
 
     // 3. MutationObserver for instant DOM insertion reaction
     if (window.MutationObserver) {
-      observer = new MutationObserver(() => {
+      observer = createObserver(() => {
         if (tryFillEmail()) {
           cleanup();
         }
@@ -267,7 +263,7 @@
       });
     }
 
-    setTimeout(cleanup, 8000);
+    trackedTimeout(cleanup, 8000);
   }
 
   /**
@@ -321,7 +317,7 @@
               fillInputValue(passwordInput, targetPassword);
 
               // Click final Next / Sign-in button after slight DOM update delay
-              setTimeout(() => {
+              trackedTimeout(() => {
                 const finalNextSelectors = [
                   '#passwordNext button',
                   '#passwordNext',
@@ -369,7 +365,7 @@
         }
       };
 
-      const pollInterval = setInterval(() => {
+      const pollInterval = trackedInterval(() => {
         attempts++;
         if (tryFillPassword() || attempts >= maxAttempts) {
           cleanup();
@@ -378,7 +374,7 @@
 
       // 3. MutationObserver for responsive SPA DOM mutations
       if (window.MutationObserver) {
-        observer = new MutationObserver(() => {
+        observer = createObserver(() => {
           if (tryFillPassword()) {
             cleanup();
           }
@@ -393,7 +389,7 @@
       }
 
       // Hard safety timeout after 8 seconds
-      setTimeout(cleanup, 8000);
+      trackedTimeout(cleanup, 8000);
 
     } catch (error) {
       console.error('[Elyx Vault] Step 2 Password observe error:', error);
@@ -428,36 +424,10 @@
     }
   }
 
-  /**
-   * Checks for URL hash token (#elyx_autofill=...) fallback
-   */
-  function checkUrlHashAutofill() {
-    try {
-      const hash = window.location.hash;
-      if (hash && hash.includes('elyx_autofill=')) {
-        const match = hash.match(/elyx_autofill=([^&]+)/);
-        if (match && match[1]) {
-          const rawPayload = decodeURIComponent(atob(match[1]));
-          const credentials = JSON.parse(rawPayload);
-
-          // Instantly wipe hash fragment from address bar for security
-          if (window.history && window.history.replaceState) {
-            const cleanUrl = window.location.protocol + '//' + window.location.host + window.location.pathname + window.location.search;
-            window.history.replaceState(null, document.title, cleanUrl);
-          }
-
-          if (credentials && (credentials.email || credentials.password)) {
-            triggerAutofillSequence(credentials);
-          }
-        }
-      }
-    } catch (e) {
-      console.error('[Elyx Vault] Auto-login payload parsing error:', e);
-    }
-  }
-
   // 1. Listen for background push messages (from tabUpdated event or popup)
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (sender.id !== chrome.runtime.id) return false;
+    if (request.action === 'ELYX_VAULT_LOCKED') { clearCredentials(); sendResponse({status:'success'}); return false; }
     if ((request.action === 'AUTOFILL' || request.action === 'AUTOFILL_GMAIL' || request.action === 'AUTO_LOGIN') && request.credentials) {
       updateCachedCredentials(request.credentials);
       triggerAutofillSequence(request.credentials);
@@ -482,13 +452,6 @@
     }
   }
 
-  // 3. Fallback check for URL hash tokens on load
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', checkUrlHashAutofill);
-  } else {
-    checkUrlHashAutofill();
-  }
-
   // 4. Immediate execution check on load if page is already at the password challenge screen
   const isPasswordPage = window.location.pathname.includes('/challenge/pwd') ||
                          !!document.querySelector('input[type="password"]');
@@ -498,6 +461,7 @@
 
   // 5. Global Bridge Listener for Web-to-Extension Communication (React Dashboard -> Content Script -> Background)
   const handleLaunchRequest = (payload) => {
+    if (!globalThis.ELYX_SECURITY?.trusted(window.location.href)) return;
     if (!payload || typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.sendMessage) return;
     const targetUrl = payload.url || 'https://accounts.google.com/v3/signin/identifier?prompt=select_account&flowName=GlifWebSignIn&flowEntry=AddSession';
     const credentials = payload.credentials || {
@@ -513,11 +477,16 @@
           url: targetUrl,
           credentials: credentials
         }
-      }, () => {
-        if (chrome.runtime && chrome.runtime.lastError) {}
+      }, response => {
+        window.dispatchEvent(new CustomEvent('ELYX_LOGIN_RESULT', {detail:{requestId:payload.requestId,status:chrome.runtime.lastError ? 'error' : response?.status}}));
       });
     } catch (e) {}
   };
+
+  window.addEventListener('ELYX_VAULT_LOCKED', () => {
+    clearCredentials();
+    if (globalThis.ELYX_SECURITY?.trusted(location.href)) chrome.runtime.sendMessage({action:'CLEAR_PENDING_CREDENTIALS'});
+  });
 
   // 5a. Listen for Custom Events
   window.addEventListener('ELYX_LAUNCH_LOGIN', (e) => {
@@ -526,7 +495,7 @@
 
   // 5b. Listen for window.postMessage
   window.addEventListener('message', (event) => {
-    if (event.source === window && event.data && (event.data.type === 'ELYX_LAUNCH_LOGIN' || event.data.action === 'ELYX_LAUNCH_LOGIN')) {
+    if (event.origin === window.location.origin && event.source === window && event.data && (event.data.type === 'ELYX_LAUNCH_LOGIN' || event.data.action === 'ELYX_LAUNCH_LOGIN')) {
       handleLaunchRequest(event.data.payload || event.data.detail);
     }
   });

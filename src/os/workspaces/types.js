@@ -1,11 +1,13 @@
+import { getAppById } from '../registry/appRegistry.js';
+import { constrainWindowBounds, SNAP_POSITIONS } from '../windows/types.js';
 /**
  * Elyx OS 1.0 — Virtual Workspaces Architecture Contracts & Types
  * Inspired by Linux GNOME Shell Activities Overview & macOS Spaces
  */
 
 export const WORKSPACE_MODES = Object.freeze({
-  DESKTOP: 'desktop',       // Normal workspace view
-  OVERVIEW: 'overview',     // Scaled multi-workspace overview / activities
+  DESKTOP: 'desktop', // Normal workspace view
+  OVERVIEW: 'overview', // Scaled multi-workspace overview / activities
 });
 
 export const DEFAULT_WORKSPACES = Object.freeze([
@@ -36,7 +38,22 @@ export function loadWorkspaces() {
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+          const valid = parsed
+            .filter(
+              (w) =>
+                w &&
+                Number.isSafeInteger(w.id) &&
+                w.id > 0 &&
+                typeof w.name === 'string',
+            )
+            .slice(0, 32)
+            .map((w) => ({
+              id: w.id,
+              name: w.name.slice(0, 80),
+              icon: typeof w.icon === 'string' ? w.icon : 'monitor',
+            }));
+          if (valid.length)
+            return [...new Map(valid.map((w) => [w.id, w])).values()];
         }
       }
     }
@@ -68,11 +85,15 @@ export function loadActiveWorkspace() {
       const stored = localStorage.getItem(STORAGE_KEY_ACTIVE_WORKSPACE);
       if (stored) {
         const parsed = Number(stored);
-        if (!isNaN(parsed)) return parsed;
+        if (
+          Number.isSafeInteger(parsed) &&
+          loadWorkspaces().some((w) => w.id === parsed)
+        )
+          return parsed;
       }
     }
   } catch {}
-  return 1;
+  return loadWorkspaces()[0].id;
 }
 
 /**
@@ -90,24 +111,16 @@ export function saveActiveWorkspace(workspaceId) {
  * Safely loads window layouts (geometries and workspace assignments) from localStorage.
  * Critical: NEVER restores secrets or plaintext keys into an unlocked state!
  */
-export function loadSavedWindowLayout() {
+export function loadSavedWindowLayout(uid) {
   try {
     if (typeof localStorage !== 'undefined') {
-      const stored = localStorage.getItem(STORAGE_KEY_SAVED_LAYOUT);
+      const stored = localStorage.getItem(
+        uid ? `${STORAGE_KEY_SAVED_LAYOUT}:${uid}` : STORAGE_KEY_SAVED_LAYOUT,
+      );
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed)) {
-          return parsed.map((item) => ({
-            id: item.id,
-            appId: item.appId,
-            title: item.title,
-            bounds: item.bounds,
-            previousBounds: item.previousBounds,
-            snapPosition: item.snapPosition || 'none',
-            isMaximized: Boolean(item.isMaximized),
-            isMinimized: Boolean(item.isMinimized),
-            workspaceId: item.workspaceId || 1,
-          }));
+          return sanitizeWindowLayout(parsed);
         }
       }
     }
@@ -120,21 +133,72 @@ export function loadSavedWindowLayout() {
 /**
  * Safely persists open window layout without saving sensitive encrypted payloads.
  */
-export function saveWindowLayout(windows) {
+export function saveWindowLayout(windows, uid) {
   try {
     if (typeof localStorage !== 'undefined' && Array.isArray(windows)) {
-      const sanitized = windows.map((w) => ({
-        id: w.id,
-        appId: w.appId,
-        title: w.title,
-        bounds: w.bounds,
-        previousBounds: w.previousBounds,
-        snapPosition: w.snapPosition || 'none',
-        isMaximized: Boolean(w.isMaximized),
-        isMinimized: Boolean(w.isMinimized),
-        workspaceId: w.workspaceId || 1,
-      }));
-      localStorage.setItem(STORAGE_KEY_SAVED_LAYOUT, JSON.stringify(sanitized));
+      const sanitized = sanitizeWindowLayout(windows);
+      localStorage.setItem(
+        uid ? `${STORAGE_KEY_SAVED_LAYOUT}:${uid}` : STORAGE_KEY_SAVED_LAYOUT,
+        JSON.stringify(sanitized),
+      );
     }
   } catch {}
+}
+
+export function sanitizeWindowLayout(
+  input,
+  viewport = { width: 1280, height: 800 },
+) {
+  if (!Array.isArray(input)) return [];
+  const seen = new Set();
+  const workspaceIds = new Set(loadWorkspaces().map((w) => w.id));
+  return input.slice(0, 40).flatMap((item) => {
+    const app = getAppById(item?.appId);
+    if (
+      !app ||
+      typeof item.id !== 'string' ||
+      item.id.length > 120 ||
+      seen.has(item.id)
+    )
+      return [];
+    if (
+      !item.bounds ||
+      !['x', 'y', 'width', 'height'].every((k) =>
+        Number.isFinite(item.bounds[k]),
+      )
+    )
+      return [];
+    seen.add(item.id);
+    const geometry = (bounds) =>
+      constrainWindowBounds(
+        Object.fromEntries(
+          ['x', 'y', 'width', 'height'].map((k) => [k, bounds[k]]),
+        ),
+        viewport,
+        app.minWindowSize,
+      );
+    return [
+      {
+        id: item.id,
+        appId: app.id,
+        bounds: geometry(item.bounds),
+        previousBounds: geometry(
+          item.previousBounds &&
+            ['x', 'y', 'width', 'height'].every((k) =>
+              Number.isFinite(item.previousBounds[k]),
+            )
+            ? item.previousBounds
+            : item.bounds,
+        ),
+        snapPosition: Object.values(SNAP_POSITIONS).includes(item.snapPosition)
+          ? item.snapPosition
+          : 'none',
+        isMaximized: Boolean(item.isMaximized),
+        isMinimized: Boolean(item.isMinimized),
+        workspaceId: workspaceIds.has(item.workspaceId)
+          ? item.workspaceId
+          : loadWorkspaces()[0].id,
+      },
+    ];
+  });
 }

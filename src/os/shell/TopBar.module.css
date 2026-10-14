@@ -723,3 +723,7 @@
     display: none;
   }
 }
+
+.controlCenterFlyout, .notificationsFlyout { max-height: calc(100dvh - 70px); overflow-y: auto; max-width: calc(100vw - 24px); }
+.notifHeader { flex-wrap: wrap; gap: 8px; }
+@media (max-width: 640px) { .notificationsFlyout { right: 12px !important; width: calc(100vw - 24px); } }

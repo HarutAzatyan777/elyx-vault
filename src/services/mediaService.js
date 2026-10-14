@@ -1,3 +1,6 @@
+import { pickPersistedFields, MEDIA_FIELDS } from '../utils/persistence.js';
+import { isLegacyCiphertext } from '../utils/securePayload.js';
+import { subscribeShared } from './sharedSubscriptions.js';
 import {
   collection,
   deleteDoc,
@@ -7,7 +10,7 @@ import {
   setDoc,
   where,
 } from 'firebase/firestore';
-import { db } from '../config/firebase.js';
+import { auth, db } from '../config/firebase.js';
 import { uploadMediaFile, deleteFromStorage } from './storageService.js';
 
 export const DEMO_MEDIA_IDS = new Set([
@@ -35,10 +38,25 @@ export const INITIAL_DEFAULT_MEDIA = [];
 export const MEDIA_CATEGORIES = [
   { id: 'All', label: 'Բոլորը (All)', icon: '📁', color: '#ec4899' },
   { id: 'Work', label: 'Աշխատանք (Work)', icon: '💼', color: '#3b82f6' },
-  { id: 'Clips', label: 'Կլիպեր & Վիդեո (Clips)', icon: '🎥', color: '#8b5cf6' },
+  {
+    id: 'Clips',
+    label: 'Կլիպեր & Վիդեո (Clips)',
+    icon: '🎥',
+    color: '#8b5cf6',
+  },
   { id: 'Assets', label: 'Ռեսուրսներ (Assets)', icon: '🎨', color: '#10b981' },
-  { id: 'Inspiration', label: 'Ինսպիրացիա (Ideas)', icon: '💡', color: '#f59e0b' },
-  { id: 'Personal', label: 'Անձնական (Personal)', icon: '👤', color: '#06b6d4' },
+  {
+    id: 'Inspiration',
+    label: 'Ինսպիրացիա (Ideas)',
+    icon: '💡',
+    color: '#f59e0b',
+  },
+  {
+    id: 'Personal',
+    label: 'Անձնական (Personal)',
+    icon: '👤',
+    color: '#06b6d4',
+  },
 ];
 
 /* -------------------------------------------------------------------------- */
@@ -67,31 +85,68 @@ function openDB() {
   });
 }
 
-export async function saveMediaBlob(id, blobOrDataUrl) {
+export async function saveMediaBlob(
+  id,
+  blobOrDataUrl,
+  expectedUid = auth.currentUser?.uid,
+) {
   try {
     const dbInstance = await openDB();
     if (!dbInstance) return;
     const tx = dbInstance.transaction(STORE_NAME, 'readwrite');
     const store = tx.objectStore(STORE_NAME);
-    store.put({ id, data: blobOrDataUrl });
+    const uid = expectedUid;
+    if (!uid || uid !== auth.currentUser?.uid) {
+      dbInstance.close();
+      throw new Error('Sign in to cache files.');
+    }
+    store.put({ id: `${uid}:${id}`, data: blobOrDataUrl });
     return new Promise((resolve) => {
-      tx.oncomplete = () => resolve(true);
-      tx.onerror = () => resolve(false);
+      tx.oncomplete = () => {
+        dbInstance.close();
+        resolve(true);
+      };
+      tx.onerror = () => {
+        dbInstance.close();
+        resolve(false);
+      };
     });
   } catch (err) {
     console.warn('[IndexedDB] Save media blob error:', err);
   }
 }
 
-export async function getMediaBlob(id) {
+export async function getMediaBlob(id, expectedUid = auth.currentUser?.uid) {
   try {
     const dbInstance = await openDB();
     if (!dbInstance) return null;
     const tx = dbInstance.transaction(STORE_NAME, 'readonly');
     const store = tx.objectStore(STORE_NAME);
-    const req = store.get(id);
+    const uid = expectedUid;
+    if (!uid || uid !== auth.currentUser?.uid) {
+      dbInstance.close();
+      return null;
+    }
+    const req = store.get(`${uid}:${id}`);
     return new Promise((resolve) => {
-      req.onsuccess = () => resolve(req.result?.data || null);
+      req.onsuccess = () => {
+        if (req.result?.data) {
+          resolve(req.result.data);
+          return;
+        }
+        if (
+          !getLocalMedia(uid).some(
+            (record) => record.id === id && record.uid === uid,
+          )
+        ) {
+          resolve(null);
+          return;
+        }
+        const legacy = store.get(id);
+        legacy.onsuccess = () => resolve(legacy.result?.data || null);
+        legacy.onerror = () => resolve(null);
+      };
+      tx.oncomplete = () => dbInstance.close();
       req.onerror = () => resolve(null);
     });
   } catch (err) {
@@ -100,13 +155,19 @@ export async function getMediaBlob(id) {
   }
 }
 
-export async function deleteMediaBlob(id) {
+export async function deleteMediaBlob(id, expectedUid = auth.currentUser?.uid) {
   try {
     const dbInstance = await openDB();
     if (!dbInstance) return;
     const tx = dbInstance.transaction(STORE_NAME, 'readwrite');
     const store = tx.objectStore(STORE_NAME);
-    store.delete(id);
+    const uid = expectedUid;
+    if (!uid || uid !== auth.currentUser?.uid) {
+      dbInstance.close();
+      return;
+    }
+    store.delete(`${uid}:${id}`);
+    tx.oncomplete = () => dbInstance.close();
   } catch (err) {
     console.warn('[IndexedDB] Delete media blob error:', err);
   }
@@ -128,7 +189,9 @@ export function getLocalMedia(uid) {
     if (raw !== null) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
-        const cleaned = parsed.filter((m) => !isDemoMedia(m));
+        const cleaned = parsed.filter(
+          (record) => record && typeof record.id === 'string',
+        );
         if (cleaned.length !== parsed.length) {
           setLocalMedia(uid, cleaned);
         }
@@ -136,7 +199,7 @@ export function getLocalMedia(uid) {
       }
     }
   } catch (err) {
-    console.warn('[Media] LocalStorage read notice:', err);
+    console.warn('[Media] LocalStorage read notice:');
   }
   return [];
 }
@@ -145,16 +208,27 @@ export function setLocalMedia(uid, items) {
   try {
     if (!Array.isArray(items)) return;
     const sanitized = items
-      .filter((m) => !isDemoMedia(m))
+      .filter((record) => record && typeof record.id === 'string')
       .map((m) => ({
-        ...m,
+        ...pickPersistedFields(m, MEDIA_FIELDS),
         // Strip base64 data URLs from localStorage (already in IndexedDB)
-        url: typeof m.url === 'string' && m.url.startsWith('data:') ? '' : m.url,
-        thumbnailUrl: typeof m.thumbnailUrl === 'string' && m.thumbnailUrl.startsWith('data:') ? '' : m.thumbnailUrl,
+        url:
+          m._encryptedLocalPayload ||
+          (typeof m.url === 'string' && /^(data:|blob:)/.test(m.url))
+            ? ''
+            : m.url,
+        thumbnailUrl:
+          m._encryptedLocalPayload ||
+          (typeof m.thumbnailUrl === 'string' &&
+            /^(data:|blob:)/.test(m.thumbnailUrl))
+            ? ''
+            : m.thumbnailUrl,
       }));
     localStorage.setItem(getStorageKey(uid), JSON.stringify(sanitized));
+    return true;
   } catch (err) {
-    console.warn('[Media] LocalStorage write notice:', err);
+    console.warn('[Media] LocalStorage write notice:');
+    return false;
   }
 }
 
@@ -163,32 +237,47 @@ let isMediaSyncInProgress = false;
 /**
  * Sync local/unsynced media items (photos & videos) to Firebase Storage & Cloud Firestore
  */
-export async function syncUnsyncedMediaToCloud(uid, businessId, unsyncedItems = null) {
+export async function syncUnsyncedMediaToCloud(
+  uid,
+  businessId,
+  unsyncedItems = null,
+) {
   if (!uid || isMediaSyncInProgress) return;
   isMediaSyncInProgress = true;
 
   try {
     const currentLocal = getLocalMedia(uid);
-    const itemsToSync = unsyncedItems && unsyncedItems.length > 0
-      ? unsyncedItems.filter((m) => !isDemoMedia(m))
-      : currentLocal.filter((m) => !isDemoMedia(m) && !m.isCloudSynced);
+    const itemsToSync =
+      unsyncedItems && unsyncedItems.length > 0
+        ? unsyncedItems.filter(
+            (record) => record && typeof record.id === 'string',
+          )
+        : currentLocal.filter((m) => !isDemoMedia(m) && !m.isCloudSynced);
 
     if (!itemsToSync.length) return;
 
     for (const item of itemsToSync) {
-      if (isDemoMedia(item)) continue;
+      if (item.isEncrypted)
+        throw new Error(
+          'Encrypted binary cloud sync is unavailable. Existing data was left intact.',
+        );
       try {
-        let binaryBlob = await getMediaBlob(item.id);
+        let binaryBlob = await getMediaBlob(item.id, uid);
         let finalUrl = item.url || '';
         let finalThumbnail = item.thumbnailUrl || '';
         let storagePath = item.storagePath || null;
 
-        const isAlreadyOnStorage = typeof finalUrl === 'string' && finalUrl.includes('firebasestorage.googleapis.com');
+        const isAlreadyOnStorage =
+          typeof finalUrl === 'string' &&
+          finalUrl.includes('firebasestorage.googleapis.com');
 
         if (!isAlreadyOnStorage && binaryBlob) {
           const uploadRes = await uploadMediaFile({
             file: binaryBlob instanceof Blob ? binaryBlob : null,
-            blobData: typeof binaryBlob === 'string' && binaryBlob.startsWith('data:') ? binaryBlob : null,
+            blobData:
+              typeof binaryBlob === 'string' && binaryBlob.startsWith('data:')
+                ? binaryBlob
+                : null,
             uid,
             id: item.id,
             fileName: item.title,
@@ -204,14 +293,23 @@ export async function syncUnsyncedMediaToCloud(uid, businessId, unsyncedItems = 
           }
         }
 
-        const isCloudUrl = typeof finalUrl === 'string' && finalUrl.startsWith('http');
+        const isCloudUrl =
+          typeof finalUrl === 'string' && finalUrl.startsWith('http');
         const firestoreMediaDoc = {
           id: item.id,
           title: item.title || '',
           description: item.description || '',
           type: item.type || 'image',
-          url: isCloudUrl ? finalUrl : (item.url?.startsWith('http') ? item.url : ''),
-          thumbnailUrl: typeof finalThumbnail === 'string' && finalThumbnail.startsWith('http') ? finalThumbnail : '',
+          url: isCloudUrl
+            ? finalUrl
+            : item.url?.startsWith('http')
+              ? item.url
+              : '',
+          thumbnailUrl:
+            typeof finalThumbnail === 'string' &&
+            finalThumbnail.startsWith('http')
+              ? finalThumbnail
+              : '',
           category: item.category || 'Assets',
           tags: item.tags || [],
           isFavorite: Boolean(item.isFavorite),
@@ -231,10 +329,15 @@ export async function syncUnsyncedMediaToCloud(uid, businessId, unsyncedItems = 
         await setDoc(docRef, firestoreMediaDoc, { merge: true });
 
         const current = getLocalMedia(uid);
-        const updated = current.map((m) => (m.id === item.id ? { ...m, ...firestoreMediaDoc } : m));
+        const updated = current.map((m) =>
+          m.id === item.id ? { ...m, ...firestoreMediaDoc } : m,
+        );
         setLocalMedia(uid, updated);
       } catch (mediaSyncErr) {
-        console.warn(`[Media Cloud Sync] Sync failed for item ${item.id}:`, mediaSyncErr.message);
+        console.warn(
+          `[Media Cloud Sync] Sync failed for item ${item.id}:`,
+          mediaSyncErr.message,
+        );
       }
     }
   } finally {
@@ -264,7 +367,7 @@ export async function cleanupDemoMediaFromCloud(uid) {
 /**
  * Realtime subscription to media collection (Firestore is source of truth, no auto-recreation loop)
  */
-export function subscribeToMedia(uid, businessId, onData, onError) {
+function subscribeToMediaSource(uid, businessId, onData, onError) {
   const localItems = getLocalMedia(uid);
   onData(localItems);
 
@@ -279,20 +382,32 @@ export function subscribeToMedia(uid, businessId, onData, onError) {
       (snapshot) => {
         const remoteItems = snapshot.docs
           .map((docSnap) => ({
-            id: docSnap.id,
             ...docSnap.data(),
+            id: docSnap.id,
           }))
           .filter((item) => !isDemoMedia(item));
 
-        remoteItems.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
-        setLocalMedia(uid, remoteItems);
-        onData(remoteItems);
+        remoteItems.sort(
+          (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0),
+        );
+        const localOnly = getLocalMedia(uid).filter(
+          (m) => m._encryptedLocalPayload,
+        );
+        const merged = [
+          ...localOnly,
+          ...remoteItems.filter((m) => !localOnly.some((l) => l.id === m.id)),
+        ];
+        setLocalMedia(uid, merged);
+        onData(merged);
       },
       (error) => {
-        console.warn('[Media Firestore] Fallback to local storage:', error.message);
+        console.warn(
+          '[Media Firestore] Fallback to local storage:',
+          error.message,
+        );
         if (onError) onError(error);
-        onData(getLocalMedia(uid));
-      }
+        onData(error.code === 'permission-denied' ? [] : getLocalMedia(uid));
+      },
     );
 
     return unsubscribe;
@@ -315,14 +430,25 @@ export async function saveMediaItem({
   skipLocalMediaUpdate = false,
   onProgress,
 }) {
+  if (!uid || uid !== auth.currentUser?.uid)
+    throw new Error('Sign in to save files.');
+  if (
+    item.isEncrypted &&
+    !item._encryptedLocalPayload &&
+    !isLegacyCiphertext(item.url)
+  )
+    throw new Error('Encrypted records require ciphertext.');
+  const encryptedBinary = Boolean(item.isEncrypted && (file || blobData));
   const now = new Date().toISOString();
   let finalUrl = item.url || '';
   let finalThumbnail = item.thumbnailUrl || '';
   let storagePath = item.storagePath || null;
 
   // 1. Upload to Firebase Storage if binary data/file is provided and not already on storage
-  const isAlreadyOnStorage = typeof finalUrl === 'string' && finalUrl.includes('firebasestorage.googleapis.com');
-  if ((file || blobData) && !isAlreadyOnStorage) {
+  const isAlreadyOnStorage =
+    typeof finalUrl === 'string' &&
+    finalUrl.includes('firebasestorage.googleapis.com');
+  if (!item.isEncrypted && (file || blobData) && !isAlreadyOnStorage) {
     try {
       const uploadRes = await uploadMediaFile({
         file,
@@ -337,29 +463,52 @@ export async function saveMediaItem({
       if (uploadRes?.downloadUrl) {
         finalUrl = uploadRes.downloadUrl;
         storagePath = uploadRes.storagePath;
-        if (item.type === 'image' && (!finalThumbnail || finalThumbnail.startsWith('data:'))) {
+        if (
+          item.type === 'image' &&
+          (!finalThumbnail || finalThumbnail.startsWith('data:'))
+        ) {
           finalThumbnail = uploadRes.downloadUrl;
         }
       }
     } catch (storageErr) {
-      console.warn('[Firebase Storage] Media upload notice, keeping local fallback:', storageErr);
+      console.warn(
+        '[Firebase Storage] Media upload notice, keeping local fallback:',
+        storageErr,
+      );
     }
   }
 
+  if (uid !== auth.currentUser?.uid)
+    throw new Error('Your session changed. Retry after signing in.');
   const mediaItem = {
-    ...item,
+    ...pickPersistedFields(item, MEDIA_FIELDS),
+    _encryptedLocalPayload: Boolean(
+      item._encryptedLocalPayload || encryptedBinary,
+    ),
     url: finalUrl,
     thumbnailUrl: finalThumbnail,
     storagePath,
-    isCloudSynced: Boolean(storagePath || (typeof finalUrl === 'string' && finalUrl.includes('firebasestorage.googleapis.com'))),
+    isCloudSynced: Boolean(
+      storagePath ||
+        (typeof finalUrl === 'string' &&
+          finalUrl.includes('firebasestorage.googleapis.com')),
+    ),
     uid: uid || 'local',
-    businessId: businessId || null,
+    businessId: item.businessId ?? businessId ?? null,
     updatedAt: now,
   };
 
   // 2. If binary blob exists, store in IndexedDB as fast local cache
   if (blobData || file) {
-    await saveMediaBlob(mediaItem.id, blobData || file);
+    const cached = await saveMediaBlob(
+      mediaItem.id,
+      item.isEncrypted ? item.url : blobData || file,
+      uid,
+    );
+    if (item.isEncrypted && !cached)
+      throw new Error(
+        'Encrypted local storage is unavailable. Nothing was saved.',
+      );
   }
 
   // 3. Update LocalStorage metadata (sanitized)
@@ -376,17 +525,27 @@ export async function saveMediaItem({
   }
 
   // 4. Sync metadata to Firestore (ALWAYS sanitize - never write large data: URLs to Firestore)
-  if (uid) {
+  if (uid && !mediaItem._encryptedLocalPayload) {
     try {
-      const isCloudUrl = typeof mediaItem.url === 'string' && mediaItem.url.startsWith('http');
+      const isCloudUrl =
+        typeof mediaItem.url === 'string' && mediaItem.url.startsWith('http');
       const firestoreMediaDoc = {
         id: mediaItem.id,
         title: mediaItem.title || '',
         description: mediaItem.description || '',
         type: mediaItem.type || 'image',
         // ONLY write public HTTP/HTTPS URL, never huge data: URLs
-        url: isCloudUrl ? mediaItem.url : '',
-        thumbnailUrl: typeof mediaItem.thumbnailUrl === 'string' && mediaItem.thumbnailUrl.startsWith('http') ? mediaItem.thumbnailUrl : '',
+        url: mediaItem.isEncrypted
+          ? mediaItem.url
+          : isCloudUrl
+            ? mediaItem.url
+            : '',
+        thumbnailUrl: mediaItem.isEncrypted
+          ? mediaItem.thumbnailUrl
+          : typeof mediaItem.thumbnailUrl === 'string' &&
+              mediaItem.thumbnailUrl.startsWith('http')
+            ? mediaItem.thumbnailUrl
+            : '',
         category: mediaItem.category || 'Assets',
         tags: mediaItem.tags || [],
         isFavorite: Boolean(mediaItem.isFavorite),
@@ -415,31 +574,47 @@ export async function saveMediaItem({
 /**
  * Save multiple media items in batch (Optimized for minimal overhead)
  */
-export async function saveBatchMediaItems(batch, uid, businessId, onBatchProgress) {
+export async function saveBatchMediaItems(
+  batch,
+  uid,
+  businessId,
+  onBatchProgress,
+) {
   const savedItems = [];
-  for (let i = 0; i < batch.length; i++) {
-    const { item, file, blobData } = batch[i];
-    const saved = await saveMediaItem({
-      item,
-      file,
-      blobData,
-      uid,
-      businessId,
-      skipLocalMediaUpdate: true,
-      onProgress: (percent) => {
-        if (typeof onBatchProgress === 'function') {
-          onBatchProgress({ index: i, total: batch.length, percent });
-        }
-      },
-    });
-    savedItems.push(saved);
+  try {
+    for (let i = 0; i < batch.length; i++) {
+      const { item, file, blobData } = batch[i];
+      const saved = await saveMediaItem({
+        item,
+        file,
+        blobData,
+        uid,
+        businessId,
+        skipLocalMediaUpdate: true,
+        onProgress: (percent) => {
+          if (typeof onBatchProgress === 'function') {
+            onBatchProgress({ index: i, total: batch.length, percent });
+          }
+        },
+      });
+      savedItems.push(saved);
+    }
+  } finally {
+    // Update localStorage once for the entire batch
+    const current = getLocalMedia(uid);
+    const next = [
+      ...savedItems,
+      ...current.filter((c) => !savedItems.some((s) => s.id === c.id)),
+    ];
+    if (
+      savedItems.length &&
+      !setLocalMedia(uid, next) &&
+      savedItems.some((record) => record._encryptedLocalPayload)
+    )
+      throw new Error(
+        'Encrypted file metadata could not be saved. Check browser storage and retry.',
+      );
   }
-
-  // Update localStorage once for the entire batch
-  const current = getLocalMedia(uid);
-  const next = [...savedItems, ...current.filter((c) => !savedItems.some((s) => s.id === c.id))];
-  setLocalMedia(uid, next);
-
   return savedItems;
 }
 
@@ -452,8 +627,12 @@ export function parseMediaFile(file) {
       reject(new Error('Ֆայլը բացակայում է'));
       return;
     }
-    const isVideo = file.type.startsWith('video/') || /\.(mp4|webm|mov|ogg)$/i.test(file.name);
-    const isImage = file.type.startsWith('image/') || /\.(png|jpg|jpeg|webp|gif|svg)$/i.test(file.name);
+    const isVideo =
+      file.type.startsWith('video/') ||
+      /\.(mp4|webm|mov|ogg)$/i.test(file.name);
+    const isImage =
+      file.type.startsWith('image/') ||
+      /\.(png|jpg|jpeg|webp|gif|svg)$/i.test(file.name);
 
     if (!isImage && !isVideo) {
       reject(new Error('Խնդրում ենք ընտրել միայն նկար կամ վիդեո ֆայլ:'));
@@ -540,7 +719,11 @@ export async function deleteMediaItem(mediaId, uid) {
   const targetItem = current.find((m) => m.id === mediaId);
 
   // 1. Delete from Firebase Storage if stored on cloud
-  if (targetItem?.storagePath || (targetItem?.url && targetItem.url.includes('firebasestorage.googleapis.com'))) {
+  if (
+    targetItem?.storagePath ||
+    (targetItem?.url &&
+      targetItem.url.includes('firebasestorage.googleapis.com'))
+  ) {
     try {
       await deleteFromStorage(targetItem.storagePath || targetItem.url);
     } catch (err) {
@@ -589,7 +772,8 @@ export function formatDuration(seconds) {
 
 export function parseYouTubeVideoId(url) {
   if (!url) return null;
-  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+  const regExp =
+    /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
   const match = url.match(regExp);
   return match && match[2].length === 11 ? match[2] : null;
 }
@@ -607,4 +791,17 @@ export function downloadMediaFile(item) {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+}
+
+export function subscribeToMedia(uid, businessId, onData, onError) {
+  if (!uid) {
+    onData([]);
+    return () => {};
+  }
+  return subscribeShared(
+    'subscribeToMedia:' + uid,
+    (emit, fail) => subscribeToMediaSource(uid, businessId, emit, fail),
+    onData,
+    onError,
+  );
 }

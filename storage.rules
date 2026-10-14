@@ -1,26 +1,16 @@
 rules_version = '2';
-
-// Craft rules based on data in your Firestore database
 service firebase.storage {
   match /b/{bucket}/o {
-    // Media vault items (Images and Videos)
-    match /media/{uid}/{allPaths=**} {
-      allow read: if true;
-      allow write: if request.auth != null || uid == 'public';
-      allow delete: if request.auth != null || uid == 'public';
+    function activeUser(uid) {
+      return request.auth != null && request.auth.uid == uid
+        && firestore.exists(/databases/(default)/documents/userAccess/$(uid))
+        && firestore.get(/databases/(default)/documents/userAccess/$(uid)).data.status == 'active'
+        && firestore.get(/databases/(default)/documents/userAccess/$(uid)).data.role in ['owner', 'manager', 'member', 'viewer']
+        && firestore.get(/databases/(default)/documents/userAccess/$(uid)).data.businessId is string
+        && firestore.get(/databases/(default)/documents/userAccess/$(uid)).data.businessId.size() > 0;
     }
-
-    // Music vault items (Audio tracks, songs, playlists)
-    match /music/{uid}/{allPaths=**} {
-      allow read: if true;
-      allow write: if request.auth != null || uid == 'public';
-      allow delete: if request.auth != null || uid == 'public';
-    }
-
-    // General fallback rule
-    match /{allPaths=**} {
-      allow read: if true;
-      allow write: if request.auth != null;
-    }
+    match /media/{uid}/{allPaths=**} { allow read, write: if activeUser(uid); }
+    match /music/{uid}/{allPaths=**} { allow read, write: if activeUser(uid); }
+    match /{allPaths=**} { allow read, write: if false; }
   }
 }

@@ -1,17 +1,30 @@
 {
   "manifest_version": 3,
   "name": "Elyx Vault Extension",
-  "version": "1.2.0",
-  "description": "Zero-knowledge password vault extension for auto-filling login credentials across web domains.",
+  "version": "1.4.1",
+  "description": "Password vault with client-side credential encryption and origin-bound autofill.",
   "permissions": [
     "activeTab",
     "scripting",
-    "storage"
+    "storage",
+    "tabs",
+    "windows"
   ],
   "host_permissions": [
     "https://*/*",
-    "http://*/*"
+    "http://*/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
   ],
+  "externally_connectable": {
+    "matches": [
+      "http://localhost/*",
+      "http://127.0.0.1/*",
+      "https://elyx-vault.web.app/*",
+      "https://elyx-vault.firebaseapp.com/*"
+    ]
+  },
+  "incognito": "spanning",
   "background": {
     "service_worker": "background.js"
   },
@@ -19,10 +32,15 @@
     {
       "matches": [
         "https://*/*",
-        "http://*/*"
+        "http://*/*",
+        "http://localhost/*",
+        "http://127.0.0.1/*"
       ],
-      "js": ["content.js"],
-      "run_at": "document_idle"
+      "js": [
+        "securityPolicy.js",
+        "content.js"
+      ],
+      "run_at": "document_start"
     }
   ],
   "action": {

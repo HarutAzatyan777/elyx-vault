@@ -30,7 +30,7 @@ logger.info('Starting Elyx Local Agent...', {
 
 const { server, port } = createAgentServer(config);
 
-server.listen(port, () => {
+server.listen(port, config.host || '127.0.0.1', () => {
   console.log(`
   =============================================================
   🚀 ELYX LOCAL AGENT IS RUNNING & ONLINE!

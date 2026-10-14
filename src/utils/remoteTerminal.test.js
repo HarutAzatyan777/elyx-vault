@@ -13,7 +13,7 @@ export function runRemoteTerminalTests() {
 
   // Test 1: JWT Session Token Verification
   const testSecret = 'test-secret-key-32-chars-long-abc';
-  const token = generateSessionToken({ uid: 'user_123', deviceId: 'dev_456' }, testSecret, '1h');
+  const token = generateSessionToken({ uid: 'user_123', deviceId: 'dev_456', deviceRecordId: 'enrollment_789' }, testSecret, '1h');
   const verified = verifySessionToken(token, testSecret);
 
   assert('Valid JWT token verifies successfully', verified.valid);

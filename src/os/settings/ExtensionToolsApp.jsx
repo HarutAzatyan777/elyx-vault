@@ -15,7 +15,7 @@ export function ExtensionToolsApp() {
       <div className={styles.section} style={{ maxWidth: '640px', margin: '0 auto' }}>
         <h2 className={styles.sectionHeading}>Elyx Chrome Extension Tools</h2>
         <p className={styles.sectionDesc}>
-          Auto-fill credentials, sync passwords, and bridge Zero-Knowledge cryptography directly to your browser tabs.
+          Auto-fill credentials, sync passwords, and bridge client-side credential encryption directly to your browser tabs.
         </p>
 
         <div className={styles.statusBox}>

@@ -1,4 +1,9 @@
-import React from 'react';
+import React, { useRef } from 'react';
+import { useFlyoutFocus } from '../hooks/useFlyoutFocus.js';
+import { useTheme } from '../../context/ThemeContext.jsx';
+import SystemControls from '../shell/SystemControls.jsx';
+import NotificationsFlyout from '../shell/NotificationsFlyout.jsx';
+import { useState } from 'react';
 import { MOBILE_NAV_STYLES, MOBILE_THEMES } from './types.js';
 import styles from './MobileShell.module.css';
 
@@ -18,6 +23,10 @@ export function MobileQuickSettings({
   onLogout,
   user,
 }) {
+  const ref = useRef(null);
+  const { theme: colorTheme, toggleTheme } = useTheme();
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  useFlyoutFocus(isOpen && !notificationsOpen, ref, onClose);
   if (!isOpen) return null;
 
   const userName = user?.displayName || user?.email?.split('@')[0] || 'User';
@@ -29,7 +38,7 @@ export function MobileQuickSettings({
       role="dialog"
       aria-label="Quick Settings Shade"
     >
-      <div className={styles.quickSettingsSheet} onClick={(e) => e.stopPropagation()}>
+      <div ref={ref} className={styles.quickSettingsSheet} onClick={(e) => e.stopPropagation()}>
         <div className={styles.drawerHandle} onClick={onClose} />
 
         {/* User Card */}
@@ -68,7 +77,7 @@ export function MobileQuickSettings({
             </div>
           </button>
 
-          {/* Tile 2: Zero-Knowledge Vault Lock */}
+          {/* Tile 2: Elyx Vault Lock */}
           <button
             type="button"
             className={`${styles.quickTile} ${isVaultUnlocked ? styles.tileWarning : styles.tileActive}`}
@@ -89,7 +98,7 @@ export function MobileQuickSettings({
             <span className={styles.tileIcon}>⚡</span>
             <div className={styles.tileTexts}>
               <span className={styles.tileLabel}>Realtime DB</span>
-              <span className={styles.tileValue}>{isRTDBConnected ? 'Online' : 'Standby'}</span>
+              <span className={styles.tileValue}>{isRTDBConnected ? 'Connected' : 'Disconnected'}</span>
             </div>
           </div>
 
@@ -141,6 +150,11 @@ export function MobileQuickSettings({
           </button>
         </div>
 
+        <button type="button" onClick={() => { onClose(); window.dispatchEvent(new Event('elyx:open-settings')); }}>System Settings</button>
+        <button type="button" onClick={toggleTheme}>Theme: {colorTheme}</button>
+        <button type="button" onClick={() => setNotificationsOpen(true)}>Notifications</button>
+        <NotificationsFlyout isOpen={notificationsOpen} onClose={() => setNotificationsOpen(false)} />
+        <SystemControls />
         {/* Bottom Actions */}
         <div className={styles.quickSettingsFooter}>
           <button

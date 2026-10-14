@@ -48,22 +48,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Detect Active Tab URL & Domain
   await detectActiveTab();
 
-  // Check saved session in storage
-  chrome.storage.local.get(['idToken', 'userId', 'userEmail', 'masterPassword'], async (result) => {
-    if (result.idToken && result.masterPassword) {
-      state.idToken = result.idToken;
-      state.userEmail = result.userEmail;
-      state.userId = result.userId || null;
-      state.masterPassword = result.masterPassword;
-      
-      const success = await fetchAndLoadProjects();
-      if (success) {
-        showVaultView();
-        return;
-      }
-    }
-    showLoginView();
-  });
+  // Keys and auth tokens stay in this popup's memory. Reopening requires unlocking.
+  chrome.storage.local.remove(['idToken','userId','userEmail','masterPassword']);
+  chrome.storage.session?.remove(['idToken','userId','userEmail','masterPassword']);
+  showLoginView();
 
   // Handle Login Form Submission
   loginForm.addEventListener('submit', async (e) => {
@@ -86,18 +74,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       // 1. Authenticate using Firebase Auth REST API
       const authData = await firebaseSignIn(email, password);
       
+      state.tokenExpiresAt = Date.now() + Number(authData.expiresIn || 3600) * 1000;
       state.idToken = authData.idToken;
       state.userId = authData.localId;
       state.userEmail = authData.email || email;
       state.masterPassword = masterPassword;
 
-      // Save session to storage
-      chrome.storage.local.set({
-        idToken: state.idToken,
-        userId: state.userId,
-        userEmail: state.userEmail,
-        masterPassword: state.masterPassword
-      });
+      passwordInput.value = ''; masterPasswordInput.value = '';
 
       // 2. Fetch Projects from Firestore
       const loaded = await fetchAndLoadProjects();
@@ -122,6 +105,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     state.projects = [];
     state.selectedProjectId = null;
     chrome.storage.local.remove(['idToken', 'userId', 'userEmail', 'masterPassword']);
+    chrome.runtime.sendMessage({action:'CLEAR_PENDING_CREDENTIALS'});
     showLoginView();
     clearStatus();
   });
@@ -135,6 +119,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Handle Auto-fill Action
   autofillBtn.addEventListener('click', async () => {
     clearStatus();
+    if (!await verifyPopupAccess()) return;
     const selected = getSelectedProject();
     if (!selected) {
       showStatus('Please select a project to auto-fill.', false);
@@ -152,6 +137,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
+    const activeTab = await chrome.tabs.get(state.activeTabId);
+    let targetOrigin;
+    try { targetOrigin = new URL(selected.loginUrl).origin; } catch { showStatus('This project needs a valid login URL.', false); return; }
+    if (!globalThis.ELYX_SECURITY.loginUrl(activeTab.url) || new URL(activeTab.url).origin !== targetOrigin) { showStatus('The active tab does not match the selected project origin.', false); return; }
     // Pass exact email/username stored in loginUrl or decrypted credentials to content script
     const payload = {
       action: 'AUTOFILL',
@@ -168,7 +157,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Fallback: execute content script via scripting API if not pre-injected
         chrome.scripting.executeScript({
           target: { tabId: state.activeTabId },
-          files: ['content.js']
+          files: ['securityPolicy.js','content.js']
         }, () => {
           if (chrome.runtime.lastError) {
             showStatus('Failed to inject content script.', false);
@@ -189,6 +178,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Handle Copy Password Action
   copyPassBtn.addEventListener('click', async () => {
     clearStatus();
+    if (!await verifyPopupAccess()) return;
     const selected = getSelectedProject();
     if (!selected) {
       showStatus('Please select a project.', false);
@@ -211,6 +201,19 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   /* --- Helper Functions --- */
 
+  async function verifyPopupAccess() {
+    try {
+      if (!state.masterPassword || !state.idToken || Date.now() >= state.tokenExpiresAt) throw Error('Expired');
+      const response = await fetch(`https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/userAccess/${encodeURIComponent(state.userId)}`, {headers:{Authorization:`Bearer ${state.idToken}`}});
+      const record = await response.json();
+      if (!response.ok || record.fields?.status?.stringValue !== 'active' || record.fields?.businessId?.stringValue !== state.businessId) throw Error('Denied');
+      return true;
+    } catch {
+      state.masterPassword = null; state.projects = []; state.idToken = null;
+      chrome.runtime.sendMessage({action:'CLEAR_PENDING_CREDENTIALS'});
+      showLoginView(); showError('Your session or business access needs verification. Sign in again.'); return false;
+    }
+  }
   async function firebaseSignIn(email, password) {
     const url = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FIREBASE_API_KEY}`;
     const response = await fetch(url, {
@@ -248,6 +251,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const accessResponse = await fetch(accessUrl, { headers: { 'Authorization': `Bearer ${state.idToken}` } });
       if (!accessResponse.ok) throw new Error('This account does not have vault access.');
       const accessDocument = await accessResponse.json();
+      if (accessDocument.fields?.status?.stringValue !== 'active' || !['owner','manager','member','viewer'].includes(accessDocument.fields?.role?.stringValue)) throw new Error('Active business access is required.');
       state.businessId = accessDocument.fields?.businessId?.stringValue;
       if (!state.businessId) throw new Error('This account is not connected to a business.');
 

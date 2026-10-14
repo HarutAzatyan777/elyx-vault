@@ -321,7 +321,7 @@ export function AppLauncher({
                         title={
                           isVaultUnlocked
                             ? 'Vault is Unlocked'
-                            : 'Protected by Zero-Knowledge Master Password'
+                            : 'Protected by your vault password'
                         }
                       >
                         {isVaultUnlocked ? '🔓' : '🔒'}

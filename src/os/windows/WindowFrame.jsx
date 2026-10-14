@@ -1,3 +1,4 @@
+import { useOS } from '../hooks/useOS.js';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { SNAP_POSITIONS } from './types.js';
 import styles from './WindowFrame.module.css';
@@ -16,6 +17,7 @@ export function WindowFrame({
   isWorkspaceActive = true,
   children,
 }) {
+  const { settings } = useOS();
   const frameRef = useRef(null);
   const dragStartRef = useRef(null);
   const resizeStartRef = useRef(null);
@@ -25,6 +27,37 @@ export function WindowFrame({
   const [titlebarMenu, setTitlebarMenu] = useState(null);
   const [snapGhost, setSnapGhost] = useState(null); // 'left' | 'right' | 'top' | null
   const snapTimerRef = useRef(null);
+  const gestureCleanupRef = useRef(() => {});
+  const frameRequestRef = useRef(null);
+  const pendingBoundsRef = useRef(null);
+  const updateBoundsRef = useRef(onUpdateBounds);
+  updateBoundsRef.current = onUpdateBounds;
+  const flushBounds = useCallback(() => {
+    if (frameRequestRef.current !== null)
+      cancelAnimationFrame(frameRequestRef.current);
+    frameRequestRef.current = null;
+    if (pendingBoundsRef.current) {
+      updateBoundsRef.current(pendingBoundsRef.current);
+      pendingBoundsRef.current = null;
+    }
+  }, []);
+  const scheduleBounds = useCallback(
+    (bounds) => {
+      pendingBoundsRef.current = bounds;
+      if (frameRequestRef.current === null)
+        frameRequestRef.current = requestAnimationFrame(flushBounds);
+    },
+    [flushBounds],
+  );
+  useEffect(
+    () => () => {
+      gestureCleanupRef.current();
+      clearTimeout(snapTimerRef.current);
+      if (frameRequestRef.current !== null)
+        cancelAnimationFrame(frameRequestRef.current);
+    },
+    [],
+  );
 
   // Focus window when clicked
   const handleContainerMouseDown = useCallback(
@@ -33,7 +66,7 @@ export function WindowFrame({
         onFocus(win.id);
       }
     },
-    [win.isFocused, win.id, onFocus]
+    [win.isFocused, win.id, onFocus],
   );
 
   // Close menus when clicking outside
@@ -55,10 +88,14 @@ export function WindowFrame({
   // --------------------------------------------------------------------------
   const handleTitleBarPointerDown = useCallback(
     (e) => {
-      if (e.target.closest('button') || e.target.closest(`.${styles.trafficLights}`)) {
+      if (
+        e.target.closest('button') ||
+        e.target.closest(`.${styles.trafficLights}`)
+      ) {
         return;
       }
 
+      gestureCleanupRef.current();
       onFocus(win.id);
 
       dragStartRef.current = {
@@ -75,7 +112,9 @@ export function WindowFrame({
         const deltaY = moveEvent.clientY - dragStartRef.current.startY;
 
         // Check for edge snap candidates
-        if (moveEvent.clientX <= 12) {
+        if (!settings.windowSnapEnabled) {
+          setSnapGhost(null);
+        } else if (moveEvent.clientX <= 12) {
           setSnapGhost('left');
         } else if (moveEvent.clientX >= window.innerWidth - 12) {
           setSnapGhost('right');
@@ -85,19 +124,35 @@ export function WindowFrame({
           setSnapGhost(null);
         }
 
-        onUpdateBounds({
+        scheduleBounds({
           x: dragStartRef.current.initialX + deltaX,
           y: dragStartRef.current.initialY + deltaY,
         });
       };
 
       const handlePointerUp = (upEvent) => {
+        flushBounds();
         // If dropped near an edge, snap window!
-        if (upEvent.clientX <= 14 && onSnap) {
+        if (
+          upEvent.type !== 'pointercancel' &&
+          upEvent.clientX <= 14 &&
+          onSnap &&
+          settings.windowSnapEnabled
+        ) {
           onSnap(win.id, SNAP_POSITIONS.LEFT_HALF);
-        } else if (upEvent.clientX >= window.innerWidth - 14 && onSnap) {
+        } else if (
+          upEvent.type !== 'pointercancel' &&
+          upEvent.clientX >= window.innerWidth - 14 &&
+          onSnap &&
+          settings.windowSnapEnabled
+        ) {
           onSnap(win.id, SNAP_POSITIONS.RIGHT_HALF);
-        } else if (upEvent.clientY <= 38 && onSnap) {
+        } else if (
+          upEvent.type !== 'pointercancel' &&
+          upEvent.clientY <= 38 &&
+          onSnap &&
+          settings.windowSnapEnabled
+        ) {
           onSnap(win.id, SNAP_POSITIONS.MAXIMIZE);
         }
 
@@ -108,11 +163,26 @@ export function WindowFrame({
         window.removeEventListener('pointercancel', handlePointerUp);
       };
 
+      gestureCleanupRef.current = () => {
+        window.removeEventListener('pointermove', handlePointerMove);
+        window.removeEventListener('pointerup', handlePointerUp);
+        window.removeEventListener('pointercancel', handlePointerUp);
+      };
       window.addEventListener('pointermove', handlePointerMove);
       window.addEventListener('pointerup', handlePointerUp);
       window.addEventListener('pointercancel', handlePointerUp);
     },
-    [win.id, win.bounds.x, win.bounds.y, win.isMaximized, onFocus, onUpdateBounds, onSnap]
+    [
+      win.id,
+      win.bounds.x,
+      win.bounds.y,
+      win.isMaximized,
+      onFocus,
+      scheduleBounds,
+      flushBounds,
+      onSnap,
+      settings.windowSnapEnabled,
+    ],
   );
 
   // Double click title bar to toggle maximize
@@ -121,7 +191,7 @@ export function WindowFrame({
       if (e.target.closest('button')) return;
       onMaximize(win.id);
     },
-    [win.id, onMaximize]
+    [win.id, onMaximize],
   );
 
   // Right click title bar for Context Menu
@@ -135,7 +205,7 @@ export function WindowFrame({
         y: Math.min(window.innerHeight - 260, Math.max(40, e.clientY)),
       });
     },
-    [win.id, onFocus]
+    [win.id, onFocus],
   );
 
   // --------------------------------------------------------------------------
@@ -148,6 +218,7 @@ export function WindowFrame({
 
       onFocus(win.id);
 
+      gestureCleanupRef.current();
       resizeStartRef.current = {
         direction,
         startX: e.clientX,
@@ -210,7 +281,7 @@ export function WindowFrame({
           }
         }
 
-        onUpdateBounds({
+        scheduleBounds({
           x: newX,
           y: newY,
           width: newWidth,
@@ -219,12 +290,18 @@ export function WindowFrame({
       };
 
       const handleResizeUp = () => {
+        flushBounds();
         resizeStartRef.current = null;
         window.removeEventListener('pointermove', handleResizeMove);
         window.removeEventListener('pointerup', handleResizeUp);
         window.removeEventListener('pointercancel', handleResizeUp);
       };
 
+      gestureCleanupRef.current = () => {
+        window.removeEventListener('pointermove', handleResizeMove);
+        window.removeEventListener('pointerup', handleResizeUp);
+        window.removeEventListener('pointercancel', handleResizeUp);
+      };
       window.addEventListener('pointermove', handleResizeMove);
       window.addEventListener('pointerup', handleResizeUp);
       window.addEventListener('pointercancel', handleResizeUp);
@@ -237,8 +314,9 @@ export function WindowFrame({
       win.bounds.height,
       win.minSize,
       onFocus,
-      onUpdateBounds,
-    ]
+      scheduleBounds,
+      flushBounds,
+    ],
   );
 
   // Keyboard accessibility: Ctrl+W to close
@@ -273,8 +351,8 @@ export function WindowFrame({
             snapGhost === 'left'
               ? styles.ghostLeft
               : snapGhost === 'right'
-              ? styles.ghostRight
-              : styles.ghostTop
+                ? styles.ghostRight
+                : styles.ghostTop
           }`}
         />
       )}
@@ -290,7 +368,8 @@ export function WindowFrame({
         onMouseDown={handleContainerMouseDown}
         role="region"
         aria-label={`${win.title} Window`}
-        aria-hidden={win.isMinimized}
+        aria-hidden={win.isMinimized || !isWorkspaceActive}
+        inert={win.isMinimized || !isWorkspaceActive}
       >
         {/* Window Titlebar */}
         <div
@@ -326,7 +405,10 @@ export function WindowFrame({
             <div
               className={styles.maxBtnWrapper}
               onMouseEnter={() => {
-                snapTimerRef.current = setTimeout(() => setShowSnapFlyout(true), 300);
+                snapTimerRef.current = setTimeout(
+                  () => setShowSnapFlyout(settings.windowSnapEnabled),
+                  300,
+                );
               }}
               onMouseLeave={() => {
                 clearTimeout(snapTimerRef.current);
@@ -340,8 +422,14 @@ export function WindowFrame({
                   onMaximize(win.id);
                   setShowSnapFlyout(false);
                 }}
-                title={win.isMaximized ? 'Restore' : 'Maximize (Hover for Snap Layouts)'}
-                aria-label={win.isMaximized ? 'Restore window' : 'Maximize window'}
+                title={
+                  win.isMaximized
+                    ? 'Restore'
+                    : 'Maximize (Hover for Snap Layouts)'
+                }
+                aria-label={
+                  win.isMaximized ? 'Restore window' : 'Maximize window'
+                }
               />
 
               {/* Windows 11-Inspired Snap Layouts Flyout */}
@@ -377,7 +465,9 @@ export function WindowFrame({
                     </div>
 
                     {/* Template 2: Four Quadrants */}
-                    <div className={`${styles.snapTemplate} ${styles.templateQuadrant}`}>
+                    <div
+                      className={`${styles.snapTemplate} ${styles.templateQuadrant}`}
+                    >
                       <button
                         type="button"
                         className={styles.snapZone}
@@ -417,7 +507,9 @@ export function WindowFrame({
                     </div>
 
                     {/* Template 3: Top/Bottom Split */}
-                    <div className={`${styles.snapTemplate} ${styles.templateRows}`}>
+                    <div
+                      className={`${styles.snapTemplate} ${styles.templateRows}`}
+                    >
                       <button
                         type="button"
                         className={styles.snapZone}
@@ -490,7 +582,9 @@ export function WindowFrame({
                 setTitlebarMenu(null);
               }}
             >
-              <span>{win.isMaximized ? 'Restore Dimensions' : 'Maximize Window'}</span>
+              <span>
+                {win.isMaximized ? 'Restore Dimensions' : 'Maximize Window'}
+              </span>
             </button>
 
             <button
@@ -519,7 +613,9 @@ export function WindowFrame({
             {workspaces.length > 1 && (
               <>
                 <div className={styles.menuDivider} />
-                <div className={styles.menuSubHeader}>Move to Virtual Desktop</div>
+                <div className={styles.menuSubHeader}>
+                  Move to Virtual Desktop
+                </div>
                 {workspaces.map((ws) => (
                   <button
                     key={ws.id}

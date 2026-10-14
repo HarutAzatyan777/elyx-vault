@@ -1,3 +1,4 @@
+import { getAppById } from '../registry/appRegistry.js';
 /**
  * Elyx OS 1.0 — Dock & Taskbar Architecture Contracts & Types
  * Inspired by macOS Quartz Dock & Windows 11 Taskbar
@@ -10,7 +11,7 @@ export const DOCK_POSITIONS = Object.freeze({
 });
 
 export const DOCK_MODES = Object.freeze({
-  DOCK: 'dock',       // macOS-inspired floating glass dock
+  DOCK: 'dock', // macOS-inspired floating glass dock
   TASKBAR: 'taskbar', // Windows 11-inspired bottom taskbar with start button & running window tabs
 });
 
@@ -58,8 +59,12 @@ export function loadPinnedApps() {
       const stored = localStorage.getItem(STORAGE_KEY_DOCK_PINNED);
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+        if (Array.isArray(parsed)) {
+          return [
+            ...new Set(
+              parsed.filter((id) => typeof id === 'string' && getAppById(id)),
+            ),
+          ].slice(0, 40);
         }
       }
     }
@@ -126,7 +131,12 @@ export function loadAutoHide() {
 export function saveAutoHide(autoHide) {
   try {
     if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(STORAGE_KEY_DOCK_AUTOHIDE, String(Boolean(autoHide)));
+      localStorage.setItem(
+        STORAGE_KEY_DOCK_AUTOHIDE,
+        String(Boolean(autoHide)),
+      );
+      if (typeof window !== 'undefined')
+        window.dispatchEvent(new Event('elyx:dock-changed'));
     }
   } catch {}
 }
@@ -140,7 +150,12 @@ export function loadRecentApps() {
       const stored = localStorage.getItem(STORAGE_KEY_RECENT_APPS);
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed))
+          return [
+            ...new Set(
+              parsed.filter((id) => typeof id === 'string' && getAppById(id)),
+            ),
+          ].slice(0, 40);
       }
     }
   } catch {}
@@ -171,7 +186,12 @@ export function loadFavoriteApps() {
       const stored = localStorage.getItem(STORAGE_KEY_FAVORITE_APPS);
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed))
+          return [
+            ...new Set(
+              parsed.filter((id) => typeof id === 'string' && getAppById(id)),
+            ),
+          ].slice(0, 40);
       }
     }
   } catch {}
@@ -184,7 +204,10 @@ export function loadFavoriteApps() {
 export function saveFavoriteApps(favorites) {
   try {
     if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(STORAGE_KEY_FAVORITE_APPS, JSON.stringify(favorites));
+      localStorage.setItem(
+        STORAGE_KEY_FAVORITE_APPS,
+        JSON.stringify(favorites),
+      );
     }
   } catch {}
 }

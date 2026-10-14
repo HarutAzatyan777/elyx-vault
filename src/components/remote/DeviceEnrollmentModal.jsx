@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import styles from './RemoteTerminal.module.css';
 
 export function DeviceEnrollmentModal({ isOpen, onClose, onRegister }) {
+  const [agentDeviceId, setAgentDeviceId] = React.useState('');
   const [name, setName] = useState('Home PC - Windows');
   const [platform, setPlatform] = useState('win32');
   const [tailscaleIp, setTailscaleIp] = useState('127.0.0.1');
@@ -16,6 +17,7 @@ export function DeviceEnrollmentModal({ isOpen, onClose, onRegister }) {
     setSubmitting(true);
     try {
       await onRegister({
+        deviceId: agentDeviceId.trim(),
         name: name.trim(),
         platform,
         tailscaleIp: tailscaleIp.trim() || '127.0.0.1',
@@ -92,7 +94,8 @@ export function DeviceEnrollmentModal({ isOpen, onClose, onRegister }) {
             <ol>
               <li>Open PowerShell on your Windows PC.</li>
               <li>Navigate to <code>D:\VAHAG\elyx-vault\elyx-vault\agent</code></li>
-              <li>Run: <code>npm install && npm start</code></li>
+              <li>Configure Firebase credentials, your allowed account ID, and the Elyx origin in <code>agent/config.json</code>.</li>
+              <li>Run: <code>npm install && npm start</code>. Copy the printed Agent Device ID into the field below.</li>
             </ol>
           </div>
 
@@ -100,7 +103,8 @@ export function DeviceEnrollmentModal({ isOpen, onClose, onRegister }) {
             <button type="button" className={styles.secondaryBtn} onClick={onClose} disabled={submitting}>
               Cancel
             </button>
-            <button type="submit" className={styles.primaryBtn} disabled={submitting}>
+            <label>Agent Device ID<input aria-label="Agent Device ID" value={agentDeviceId} onChange={e => setAgentDeviceId(e.target.value)} required /></label>
+          <button type="submit" className={styles.primaryBtn} disabled={submitting}>
               {submitting ? 'Enrolling...' : 'Approve & Register Device'}
             </button>
           </div>
