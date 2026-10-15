@@ -4,6 +4,11 @@ import { useSystemStatus } from '../hooks/useSystemStatus.js';
 import { useTheme } from '../../context/ThemeContext.jsx';
 import { WALLPAPER_PRESETS } from '../desktop/types.js';
 import { loadAutoHide, saveAutoHide, saveDockMode } from '../dock/types.js';
+import {
+  isMasterPasswordSaved,
+  clearStoredMasterPassword,
+  saveStoredMasterPassword,
+} from '../../utils/vaultAuth.js';
 import styles from './SystemSettingsApp.module.css';
 const categories = [
   'Appearance',
@@ -38,6 +43,7 @@ export default function SystemSettingsApp({
     useSystemStatus();
   const { theme } = useTheme();
   const [active, setActive] = useState('Appearance');
+  const [authUpdateTick, setAuthUpdateTick] = useState(0);
   const [autoHide, setAutoHide] = useState(loadAutoHide);
   const [storage, setStorage] = useState(null);
   const [storageError, setStorageError] = useState('');
@@ -297,10 +303,23 @@ export default function SystemSettingsApp({
           )}
           {active === 'Privacy and Security' && (
             <>
-              <p>
-                Vault: {masterPassword ? 'Unlocked' : 'Locked'}. The password
-                stays in memory; reloading requires unlocking again.
-              </p>
+              <div style={{ marginBottom: '1rem', lineHeight: '1.6' }}>
+                <p>
+                  Vault status:{' '}
+                  <strong>
+                    {masterPassword ? '🔓 Unlocked (Decrypted)' : '🔒 Locked'}
+                  </strong>
+                </p>
+                <p>
+                  Remembered on this device:{' '}
+                  <strong>
+                    {isMasterPasswordSaved()
+                      ? '✅ Yes (Auto-unlocks on reload)'
+                      : '❌ No (Requires manual entry on reload)'}
+                  </strong>
+                </p>
+              </div>
+
               <label className={styles.toggleRow}>
                 Lock after inactivity
                 <select
@@ -310,21 +329,60 @@ export default function SystemSettingsApp({
                     updateSettings({ autoLockMinutes: Number(e.target.value) })
                   }
                 >
-                  {[1, 5, 15, 30, 60].map((n) => (
-                    <option key={n} value={n}>
-                      {n} minutes
-                    </option>
-                  ))}
+                  <option value={0}>Never (Don&apos;t auto-lock)</option>
+                  <option value={1}>1 minute</option>
+                  <option value={5}>5 minutes</option>
+                  <option value={15}>15 minutes (Default)</option>
+                  <option value={30}>30 minutes</option>
+                  <option value={60}>1 hour</option>
+                  <option value={240}>4 hours</option>
+                  <option value={1440}>24 hours</option>
                 </select>
               </label>
-              <button
-                type="button"
-                className={styles.dangerBtn}
-                disabled={!masterPassword}
-                onClick={onLockVault}
+
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '0.75rem',
+                  flexWrap: 'wrap',
+                  marginTop: '1.25rem',
+                }}
               >
-                Lock vault
-              </button>
+                <button
+                  type="button"
+                  className={styles.dangerBtn}
+                  disabled={!masterPassword}
+                  onClick={onLockVault}
+                >
+                  Lock vault now
+                </button>
+                {isMasterPasswordSaved() ? (
+                  <button
+                    type="button"
+                    className={styles.dangerBtn}
+                    onClick={() => {
+                      clearStoredMasterPassword();
+                      setAuthUpdateTick((t) => t + 1);
+                    }}
+                    title="Remove remembered master password from this browser"
+                  >
+                    Forget saved password
+                  </button>
+                ) : (
+                  masterPassword && (
+                    <button
+                      type="button"
+                      className={styles.primaryBtn}
+                      onClick={() => {
+                        saveStoredMasterPassword(masterPassword);
+                        setAuthUpdateTick((t) => t + 1);
+                      }}
+                    >
+                      Remember password on this device
+                    </button>
+                  )
+                )}
+              </div>
             </>
           )}
           {active === 'Storage' && (

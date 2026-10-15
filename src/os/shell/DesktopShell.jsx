@@ -14,6 +14,7 @@ import AppSwitcher from '../windows/AppSwitcher.jsx';
 import {
   loadAutoHide,
 } from '../dock/types.js';
+import { getStoredMasterPassword } from '../../utils/vaultAuth.js';
 import styles from './DesktopShell.module.css';
 
 export function DesktopShell({
@@ -174,6 +175,15 @@ export function DesktopShell({
     windows.length,
   ]);
 
+  const handleTriggerUnlock = useCallback(() => {
+    const saved = getStoredMasterPassword();
+    if (saved) {
+      handleUnlockVault(saved, true);
+    } else {
+      handleOpenApp('notepad');
+    }
+  }, [handleUnlockVault, handleOpenApp]);
+
   return (
     <div className={styles.desktopShellRoot}>
       {systemNotice && <div role="status" style={{position:'fixed',top:48,left:'50%',transform:'translateX(-50%)',zIndex:2000,background:'var(--elyx-surface-window-body)',color:'var(--elyx-text-primary)',padding:'10px 16px',borderRadius:12,maxWidth:'90vw'}}>{systemNotice}</div>}
@@ -184,7 +194,7 @@ export function DesktopShell({
         isRTDBConnected={isRTDBConnected}
         isVaultUnlocked={Boolean(masterPassword)}
         onLockVault={handleLockVault}
-        onUnlockVault={() => handleOpenApp('notepad')}
+        onUnlockVault={handleTriggerUnlock}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onSwitchToClassic={toggleOSMode}
         onLogout={logout}
@@ -203,7 +213,7 @@ export function DesktopShell({
         isRTDBConnected={isRTDBConnected}
         isVaultUnlocked={Boolean(masterPassword)}
         onLockVault={handleLockVault}
-        onUnlockVault={() => handleOpenApp('notepad')}
+        onUnlockVault={handleTriggerUnlock}
         onOpenSettings={() => setIsSettingsOpen(true)}
       />
 
@@ -253,7 +263,7 @@ export function DesktopShell({
         onLockVault={handleLockVault}
         onUnlockVault={() => {
           setIsCommandPaletteOpen(false);
-          handleOpenApp('notepad');
+          handleTriggerUnlock();
         }}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenAbout={() => setIsAboutOpen(true)}

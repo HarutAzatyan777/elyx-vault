@@ -96,7 +96,7 @@ export function normalizeSettings(input = {}) {
         ['system', 'security', 'media', 'workspace', 'devices'].includes(x),
       )
     : [];
-  if (![1, 5, 15, 30, 60].includes(result.autoLockMinutes))
-    result.autoLockMinutes = 15;
+  if (![0, 1, 5, 15, 30, 60, 240, 1440].includes(result.autoLockMinutes))
+    result.autoLockMinutes = DEFAULT_OS_SETTINGS.autoLockMinutes;
   return result;
 }

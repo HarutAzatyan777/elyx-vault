@@ -1,23 +1,62 @@
 import React, { useState } from 'react';
 import styles from './MasterPassModal.module.css';
+import {
+  getStoredMasterPassword,
+  clearStoredMasterPassword,
+  getRememberPreference,
+  setRememberPreference,
+} from '../utils/vaultAuth.js';
 
 /**
  * Modal dialog prompting the user for their master password to decrypt vault contents.
+ * Supports "Remember on this device" to avoid prompting continuously.
  *
- * @param {{ onSubmit: (password: string) => void }} props
+ * @param {{ onSubmit: (password: string, rememberDevice?: boolean) => Promise<void> | void }} props
  */
 export const MasterPassModal = ({ onSubmit }) => {
-  const [password, setPassword] = useState('');
+  const savedPassword = getStoredMasterPassword();
+  const [password, setPassword] = useState(savedPassword || '');
   const [error, setError] = useState('');
+  const [rememberDevice, setRememberDevice] = useState(() => getRememberPreference());
+  const [hasSavedPass, setHasSavedPass] = useState(Boolean(savedPassword));
+
+  const handleToggleRemember = (checked) => {
+    setRememberDevice(checked);
+    setRememberPreference(checked);
+  };
+
+  const handleForgetSaved = () => {
+    clearStoredMasterPassword();
+    setHasSavedPass(false);
+    setPassword('');
+    setRememberDevice(false);
+  };
+
+  const handleQuickUnlock = async () => {
+    const currentSaved = getStoredMasterPassword();
+    if (!currentSaved) return;
+    setError('');
+    try {
+      await onSubmit(currentSaved, true);
+    } catch {
+      setError('Unlock failed. Please re-enter your password.');
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!password.trim()) {
+    const passToSubmit = password.trim();
+    if (!passToSubmit) {
       setError('Please enter your master password.');
       return;
     }
     setError('');
-    try { await onSubmit(password); setPassword(''); } catch { setError('Unlock failed. Check your password and connection.'); }
+    try {
+      await onSubmit(passToSubmit, rememberDevice);
+      setPassword('');
+    } catch {
+      setError('Unlock failed. Check your password and connection.');
+    }
   };
 
   return (
@@ -44,6 +83,29 @@ export const MasterPassModal = ({ onSubmit }) => {
           </p>
         </div>
 
+        {hasSavedPass && (
+          <div className={styles.savedNoticeBox}>
+            <div className={styles.savedNoticeHeader}>
+              <span>🔑 Password saved on this device</span>
+              <button
+                type="button"
+                onClick={handleForgetSaved}
+                className={styles.forgetBtn}
+                title="Remove saved password from this device"
+              >
+                Forget
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={handleQuickUnlock}
+              className={styles.quickUnlockBtn}
+            >
+              Quick Unlock with Saved Password
+            </button>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className={styles.form}>
           <div className={styles.field}>
             <label className={styles.label}>Master Password / Encryption PIN</label>
@@ -59,7 +121,23 @@ export const MasterPassModal = ({ onSubmit }) => {
             {error && <p className={styles.errorText}>{error}</p>}
           </div>
 
-          <p className={styles.subtitle}>Your key stays in memory until you lock the vault or reload.</p>
+          <label className={styles.rememberRow}>
+            <input
+              type="checkbox"
+              checked={rememberDevice}
+              onChange={(e) => handleToggleRemember(e.target.checked)}
+              className={styles.checkbox}
+            />
+            <span className={styles.rememberText}>
+              Remember master password on this device (Do not ask again)
+            </span>
+          </label>
+
+          <p className={styles.subtitle}>
+            {rememberDevice
+              ? 'Your vault will stay unlocked on this device even after reload.'
+              : 'Your key stays in memory until you lock the vault or reload.'}
+          </p>
 
           <button type="submit" className={styles.button}>
             Unlock Vault

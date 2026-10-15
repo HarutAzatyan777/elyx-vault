@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../config/firebase.js';
 import { encryptData } from '../utils/crypto.js';
+import { PROJECT_PRESETS } from '../constants/projectPresets.js';
 import styles from './AddProject.module.css';
 import { useAuth } from '../hooks/useAuth.jsx';
 
@@ -18,6 +19,13 @@ export const AddProject = ({ masterPassword }) => {
   const [secretData, setSecretData] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState({ text: '', isError: false });
+
+  const handleApplyPreset = (preset) => {
+    setLoginUrl(preset.url);
+    if (!name.trim() || PROJECT_PRESETS.some((p) => p.name === name.trim())) {
+      setName(preset.name);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -62,6 +70,7 @@ export const AddProject = ({ masterPassword }) => {
         loginUrl: loginUrl.trim(),
         encryptedCredentials,
         createdBy: user.uid,
+        creatorEmail: user.email || '',
         createdAt: new Date().toISOString(),
       });
 
@@ -81,6 +90,33 @@ export const AddProject = ({ masterPassword }) => {
   return (
     <div className={styles.formContainer}>
       <h3 className={styles.title}>Add New Encrypted Project</h3>
+
+      {/* 1-Click Quick URL Presets */}
+      <div className={styles.presetsBar}>
+        <div className={styles.presetsHeader}>
+          <span className={styles.presetsLabel}>Quick Presets / Templates</span>
+          <span className={styles.presetsHint}>Click to auto-fill URL & name</span>
+        </div>
+        <div className={styles.presetsList}>
+          {PROJECT_PRESETS.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              className={styles.presetBtn}
+              style={{
+                backgroundColor: p.bg,
+                borderColor: p.color,
+              }}
+              onClick={() => handleApplyPreset(p)}
+              title={`Auto-fill ${p.name}`}
+            >
+              <span>{p.icon}</span>
+              <span>{p.name}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
       <form onSubmit={handleSubmit} className={styles.form}>
         <div className={styles.grid}>
           <div className={styles.field}>

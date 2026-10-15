@@ -38,6 +38,11 @@ import { useRemoteDevices } from '../hooks/useRemoteDevices';
 import { subscribeRTDBConnection } from '../services/rtdbService';
 import Sidebar from '../components/Sidebar';
 import { useOS } from '../os/index.js';
+import {
+  getStoredMasterPassword,
+  saveStoredMasterPassword,
+  clearStoredMasterPassword,
+} from '../utils/vaultAuth.js';
 const DesktopShell = lazy(() => import('../os/shell/DesktopShell.jsx'));
 const MobileShell = lazy(() => import('../os/mobile/MobileShell.jsx'));
 import { loadDeviceMode, saveDeviceMode } from '../os/mobile/types.js';
@@ -133,16 +138,53 @@ export const Dashboard = () => {
   const [projectsError, setProjectsError] = useState('');
   const [projects, setProjects] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [masterPassword, setMasterPassword] = useState(null);
-  useEffect(() => {
+  const [masterPassword, setMasterPassword] = useState(() => {
     try {
-      sessionStorage.removeItem('elyx_master_pass');
-      localStorage.removeItem('elyx_master_pass');
-    } catch {}
-  }, []);
+      return getStoredMasterPassword() || null;
+    } catch {
+      return null;
+    }
+  });
+  useEffect(() => {
+    if (!masterPassword) {
+      const saved = getStoredMasterPassword();
+      if (saved) {
+        setMasterPassword(saved);
+      }
+    }
+  }, [masterPassword]);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
   const [isEnrollModalOpen, setIsEnrollModalOpen] = useState(false);
   const [mainTab, setMainTab] = useState(getInitialTab);
+  const [projectScope, setProjectScope] = useState(() => {
+    try {
+      return localStorage.getItem('elyx_project_scope') || 'my';
+    } catch {
+      return 'my';
+    }
+  });
+
+  const handleScopeChange = (scope) => {
+    setProjectScope(scope);
+    try {
+      localStorage.setItem('elyx_project_scope', scope);
+    } catch {}
+  };
+
+  const myProjects = React.useMemo(() => {
+    if (!user) return [];
+    return projects.filter((p) => {
+      if (p.createdBy) {
+        return p.createdBy === user.uid;
+      }
+      if (p.email && user.email && p.email.toLowerCase() === user.email.toLowerCase()) {
+        return true;
+      }
+      return access?.role === 'owner';
+    });
+  }, [projects, user, access?.role]);
+
+  const displayedProjects = projectScope === 'my' ? myProjects : projects;
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     try {
@@ -251,34 +293,43 @@ export const Dashboard = () => {
     return () => unsubscribe();
   }, [user, access?.businessId]);
 
-  const handleUnlockVault = (password) => {
+  const handleUnlockVault = (password, rememberDevice = true) => {
     if (
       !isOffline &&
       user &&
       access?.status === 'active' &&
       typeof password === 'string' &&
       password.trim()
-    )
+    ) {
       setMasterPassword(password);
+      if (rememberDevice) {
+        saveStoredMasterPassword(password);
+      } else {
+        clearStoredMasterPassword();
+      }
+    }
   };
-  const handleLockVault = useCallback(() => {
+  const handleLockVault = useCallback((forget = false) => {
     setMasterPassword(null);
+    if (forget) {
+      clearStoredMasterPassword();
+    }
     stopMusicPlayback();
     window.dispatchEvent(new Event('elyx:vault-locked'));
     window.dispatchEvent(new Event('ELYX_VAULT_LOCKED'));
   }, [stopMusicPlayback]);
   useEffect(() => {
-    if (!masterPassword) return;
+    if (!masterPassword || !settings.autoLockMinutes || settings.autoLockMinutes <= 0) return;
     let timer;
     let lastActivity = Date.now();
     const foreground = () => {
       if (Date.now() - lastActivity >= settings.autoLockMinutes * 60000)
-        handleLockVault();
+        handleLockVault(false);
     };
     const reset = () => {
       clearTimeout(timer);
       lastActivity = Date.now();
-      timer = setTimeout(handleLockVault, settings.autoLockMinutes * 60000);
+      timer = setTimeout(() => handleLockVault(false), settings.autoLockMinutes * 60000);
     };
     reset();
     document.addEventListener('visibilitychange', foreground);
@@ -295,9 +346,13 @@ export const Dashboard = () => {
   useEffect(() => {
     const offline = () => {
       setIsOffline(true);
-      handleLockVault();
+      handleLockVault(false);
     };
-    const online = () => setIsOffline(false);
+    const online = () => {
+      setIsOffline(false);
+      const saved = getStoredMasterPassword();
+      if (saved) setMasterPassword(saved);
+    };
     window.addEventListener('offline', offline);
     window.addEventListener('online', online);
     return () => {
@@ -354,7 +409,7 @@ export const Dashboard = () => {
           }
           user={user}
           access={access}
-          projects={projects}
+          projects={displayedProjects}
           onDeleteProject={handleDelete}
           devices={devices}
           securityEvents={securityEvents}
@@ -384,7 +439,7 @@ export const Dashboard = () => {
         }
         user={user}
         access={access}
-        projects={projects}
+        projects={displayedProjects}
         onDeleteProject={handleDelete}
         devices={devices}
         securityEvents={securityEvents}
@@ -412,7 +467,7 @@ export const Dashboard = () => {
       <Sidebar
         activeTab={mainTab}
         setActiveTab={handleTabChange}
-        projectsCount={projects.length}
+        projectsCount={displayedProjects.length}
         userEmail={user?.email}
         masterPassword={masterPassword}
         onLockVault={handleLockVault}
@@ -764,10 +819,37 @@ export const Dashboard = () => {
                         </p>
                       </div>
 
-                      <span className={styles.badge}>
-                        {projects.length}{' '}
-                        {projects.length === 1 ? 'Project' : 'Projects'}
-                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                        <div className={styles.scopeToggle} role="tablist" aria-label="Project Scope Filter">
+                          <button
+                            type="button"
+                            role="tab"
+                            aria-selected={projectScope === 'my'}
+                            className={`${styles.scopeBtn} ${projectScope === 'my' ? styles.scopeBtnActive : ''}`}
+                            onClick={() => handleScopeChange('my')}
+                            title="Show only your individual projects"
+                          >
+                            <span>👤 My Projects</span>
+                            <span className={styles.scopeCount}>{myProjects.length}</span>
+                          </button>
+                          <button
+                            type="button"
+                            role="tab"
+                            aria-selected={projectScope === 'all'}
+                            className={`${styles.scopeBtn} ${projectScope === 'all' ? styles.scopeBtnActive : ''}`}
+                            onClick={() => handleScopeChange('all')}
+                            title="Show all projects in workspace"
+                          >
+                            <span>🏢 All Projects</span>
+                            <span className={styles.scopeCount}>{projects.length}</span>
+                          </button>
+                        </div>
+
+                        <span className={styles.badge}>
+                          {displayedProjects.length}{' '}
+                          {displayedProjects.length === 1 ? 'Project' : 'Projects'}
+                        </span>
+                      </div>
                     </div>
 
                     {isLoading ? (
@@ -776,7 +858,7 @@ export const Dashboard = () => {
                           <div key={number} className={styles.skeleton} />
                         ))}
                       </div>
-                    ) : projects.length === 0 ? (
+                    ) : displayedProjects.length === 0 ? (
                       <div className={styles.emptyState}>
                         <svg
                           className={styles.emptyIcon}
@@ -792,16 +874,21 @@ export const Dashboard = () => {
                           />
                         </svg>
 
-                        <h3 className={styles.emptyTitle}>No Projects Found</h3>
+                        <h3 className={styles.emptyTitle}>
+                          {projectScope === 'my'
+                            ? 'No Personal Projects'
+                            : 'No Projects Found'}
+                        </h3>
 
                         <p className={styles.emptyText}>
-                          There are currently no projects available for this
-                          business.
+                          {projectScope === 'my'
+                            ? 'You have not added any individual projects yet. Use the presets above to add your first project.'
+                            : 'There are currently no projects available for this business.'}
                         </p>
                       </div>
                     ) : (
                       <div className={styles.grid}>
-                        {projects.map((project) => (
+                        {displayedProjects.map((project) => (
                           <ProjectCard
                             key={project.id}
                             project={project}

@@ -4,6 +4,8 @@ import { useAuth } from '../hooks/useAuth.jsx';
 import { isActiveAccess } from '../utils/access.js';
 import React, { useState, useRef, useEffect } from 'react';
 import { decryptData } from '../utils/crypto.js';
+import { getPresetForService } from '../constants/projectPresets.js';
+import EditProjectModal from './EditProjectModal.jsx';
 import styles from './ProjectCard.module.css';
 
 /**
@@ -54,6 +56,7 @@ export const ProjectCard = ({ project, masterPassword, onDelete }) => {
     }
   };
   const [isCopied, setIsCopied] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
 
   const getDecryptedData = () => {
     if (!allowed) return { email: '', password: '' };
@@ -204,35 +207,72 @@ export const ProjectCard = ({ project, masterPassword, onDelete }) => {
   const { email: decryptedEmail } = getDecryptedData();
   const displayEmail =
     project.email || project.username || decryptedEmail || '';
+  const preset = getPresetForService(project.loginUrl, project.name);
 
   return (
     <div className={styles.card}>
       <div className={styles.content}>
         <div className={styles.headerRow}>
-          <h3 className={styles.title}>{project.name}</h3>
-          <button
-            disabled={!allowed || access?.role === 'viewer'}
-            onClick={handleDeleteClick}
-            className={styles.deleteBtn}
-            title="Delete Project"
-            aria-label="Delete Project"
-          >
-            <svg
-              width="18"
-              height="18"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              xmlns="http://www.w3.org/2000/svg"
+          <h3 className={styles.title}>
+            {preset && (
+              <span
+                className={styles.serviceBadge}
+                style={{ backgroundColor: preset.bg, color: preset.color }}
+                title={`${preset.name} Project`}
+              >
+                {preset.icon}
+              </span>
+            )}
+            <span>{project.name}</span>
+          </h3>
+          <div className={styles.headerActions}>
+            <button
+              type="button"
+              disabled={!allowed || access?.role === 'viewer'}
+              onClick={() => setIsEditOpen(true)}
+              className={styles.editBtn}
+              title="Edit Project"
+              aria-label="Edit Project"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="1.5"
-                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-              />
-            </svg>
-          </button>
+              <svg
+                width="17"
+                height="17"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="1.5"
+                  d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                />
+              </svg>
+            </button>
+            <button
+              disabled={!allowed || access?.role === 'viewer'}
+              onClick={handleDeleteClick}
+              className={styles.deleteBtn}
+              title="Delete Project"
+              aria-label="Delete Project"
+            >
+              <svg
+                width="18"
+                height="18"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="1.5"
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {displayEmail && (
@@ -286,6 +326,15 @@ export const ProjectCard = ({ project, masterPassword, onDelete }) => {
           {isCopied ? 'Copied!' : 'Copy Password'}
         </button>
       </div>
+
+      {isEditOpen && (
+        <EditProjectModal
+          project={project}
+          masterPassword={masterPassword}
+          isOpen={isEditOpen}
+          onClose={() => setIsEditOpen(false)}
+        />
+      )}
     </div>
   );
 };

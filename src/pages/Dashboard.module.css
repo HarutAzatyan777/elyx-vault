@@ -322,6 +322,49 @@
   white-space: nowrap;
 }
 
+.scopeToggle {
+  display: inline-flex;
+  align-items: center;
+  background: var(--bg-card-alt, rgba(255, 255, 255, 0.05));
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.1));
+  border-radius: 9999px;
+  padding: 3px;
+  gap: 2px;
+}
+
+.scopeBtn {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 0.35rem 0.85rem;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.scopeBtn:hover {
+  color: var(--text-primary);
+}
+
+.scopeBtnActive {
+  background: var(--accent-primary, #6366f1) !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
+}
+
+.scopeCount {
+  font-size: 0.7rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+
 /* =========================
    PROJECT GRID
    ========================= */

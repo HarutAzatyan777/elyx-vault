@@ -21,6 +21,7 @@ import MobileBottomNav from './MobileBottomNav.jsx';
 import MobileAppDrawer from './MobileAppDrawer.jsx';
 import MobileQuickSettings from './MobileQuickSettings.jsx';
 import MobileAppSwitcher from './MobileAppSwitcher.jsx';
+import { getStoredMasterPassword } from '../../utils/vaultAuth.js';
 
 import styles from './MobileShell.module.css';
 
@@ -244,6 +245,15 @@ export function MobileShell({
     touchStartXRef.current = null;
   };
 
+  const handleTriggerUnlock = useCallback(() => {
+    const saved = getStoredMasterPassword();
+    if (saved) {
+      handleUnlockVault(saved, true);
+    } else {
+      handleOpenApp('notepad');
+    }
+  }, [handleUnlockVault, handleOpenApp]);
+
   return (
     <div
       className={styles.mobileRoot}
@@ -292,7 +302,7 @@ export function MobileShell({
         currentTrack={currentTrack}
         isPlaying={isPlaying}
         onToggleQuickSettings={() => setIsQuickSettingsOpen((prev) => !prev)}
-        onUnlockVault={() => handleOpenApp('notepad')}
+        onUnlockVault={handleTriggerUnlock}
         onLockVault={handleLockVault}
       />
 
@@ -302,7 +312,7 @@ export function MobileShell({
         onOpenApp={handleOpenApp}
         onOpenDrawer={() => setIsDrawerOpen(true)}
         isVaultUnlocked={Boolean(masterPassword)}
-        onUnlockVault={() => handleOpenApp('notepad')}
+        onUnlockVault={handleTriggerUnlock}
         onLockVault={handleLockVault}
         activeAppId={activeAppId}
         userRole={access?.role || 'viewer'}
@@ -363,7 +373,7 @@ export function MobileShell({
         isVaultUnlocked={Boolean(masterPassword)}
         onUnlockVault={() => {
           setIsQuickSettingsOpen(false);
-          handleOpenApp('notepad');
+          handleTriggerUnlock();
         }}
         onLockVault={handleLockVault}
         onSwitchToDesktop={() => {
